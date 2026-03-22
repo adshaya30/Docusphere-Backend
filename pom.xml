@@ -69,6 +69,16 @@
             <scope>provided</scope>
         </dependency>
 
+        <!--Swagger -->
+
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>2.6.0</version>
+            <scope>compile</scope>
+        </dependency>
+
+
         <!-- JWT -->
         <dependency>
             <groupId>io.jsonwebtoken</groupId>
