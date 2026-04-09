@@ -1,15 +1,15 @@
-package com.docusphere.backend.service;
+package com.docusphere.backend.Authentication.service;
 
 import com.docusphere.backend.config.AdminConfig;
 import com.docusphere.backend.config.AppConfig;
-import com.docusphere.backend.dto.SignUpRequest;
-import com.docusphere.backend.entity.Role;
-import com.docusphere.backend.entity.User;
-import com.docusphere.backend.entity.VerificationToken;
+import com.docusphere.backend.Authentication.dto.SignUpRequest;
+import com.docusphere.backend.Authentication.entity.Role;
+import com.docusphere.backend.Authentication.entity.User;
+import com.docusphere.backend.Authentication.entity.VerificationToken;
 import com.docusphere.backend.exception.*;
-import com.docusphere.backend.repository.RoleRepository;
-import com.docusphere.backend.repository.UserRepository;
-import com.docusphere.backend.repository.VerificationTokenRepository;
+import com.docusphere.backend.Authentication.repository.RoleRepository;
+import com.docusphere.backend.Authentication.repository.UserRepository;
+import com.docusphere.backend.Authentication.repository.VerificationTokenRepository;
 import jakarta.mail.MessagingException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

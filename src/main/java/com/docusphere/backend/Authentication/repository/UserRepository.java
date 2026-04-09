@@ -1,6 +1,6 @@
-package com.docusphere.backend.repository;
+package com.docusphere.backend.Authentication.repository;
 
-import com.docusphere.backend.entity.User;
+import com.docusphere.backend.Authentication.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.Optional;
 

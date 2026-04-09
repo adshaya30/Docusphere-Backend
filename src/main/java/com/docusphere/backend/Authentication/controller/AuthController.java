@@ -1,10 +1,13 @@
-package com.docusphere.backend.controller;
+package com.docusphere.backend.Authentication.controller;
 
-import com.docusphere.backend.dto.*;
-import com.docusphere.backend.entity.User;
-import com.docusphere.backend.service.JwtService;
-import com.docusphere.backend.service.UserService;
-import com.docusphere.backend.service.security.CustomUserDetailsService;
+import com.docusphere.backend.Authentication.dto.AuthResponse;
+import com.docusphere.backend.Authentication.dto.MessageResponse;
+import com.docusphere.backend.Authentication.dto.SignInRequest;
+import com.docusphere.backend.Authentication.dto.SignUpRequest;
+import com.docusphere.backend.Authentication.entity.User;
+import com.docusphere.backend.Authentication.service.JwtService;
+import com.docusphere.backend.Authentication.service.UserService;
+import com.docusphere.backend.Authentication.service.security.CustomUserDetailsService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -25,7 +28,7 @@ public class AuthController {
     private final CustomUserDetailsService userDetailsService;
 
     @PostMapping("/signUp")
-    public ResponseEntity<MessageResponse> register(@Valid @RequestBody SignUpRequest request) {
+    public ResponseEntity<com.docusphere.backend.Authentication.dto.MessageResponse> register(@Valid @RequestBody SignUpRequest request) {
         userService.signUp(request);
         return ResponseEntity.ok(new MessageResponse("Please check your email to verify your account."));
     }
@@ -68,6 +71,9 @@ public class AuthController {
             String jwt = jwtService.generateToken((org.springframework.security.core.userdetails.User) authentication.getPrincipal(), user.getRole().getName());
 
             return ResponseEntity.ok(new AuthResponse(jwt, user.getRole().getName().replace("ROLE_", ""), user.getFullName(), user.getEmail()));
+        } catch (com.docusphere.backend.exception.UserNotFoundException e) {
+            // User not found - provide helpful message to sign up
+            throw new BadCredentialsException("Email not registered. Please sign up first.");
         } catch (BadCredentialsException e) {
             // If it's our custom message, throw it as is
             if (e.getMessage().contains("Email not verified")) {

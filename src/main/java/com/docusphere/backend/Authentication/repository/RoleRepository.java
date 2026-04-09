@@ -1,5 +1,5 @@
-package com.docusphere.backend.repository;
-import com.docusphere.backend.entity.Role;
+package com.docusphere.backend.Authentication.repository;
+import com.docusphere.backend.Authentication.entity.Role;
 import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.Optional;
 public interface RoleRepository extends JpaRepository<Role,Long>{
