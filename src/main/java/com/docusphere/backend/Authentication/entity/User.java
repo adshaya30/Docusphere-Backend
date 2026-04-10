@@ -1,4 +1,4 @@
-package com.docusphere.backend.entity;
+package com.docusphere.backend.Authentication.entity;
 import jakarta.persistence.*;
 import lombok.*;
 

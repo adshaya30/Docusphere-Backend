@@ -1,7 +1,7 @@
-package com.docusphere.backend.service.security;
+package com.docusphere.backend.Authentication.service.security;
 
-import com.docusphere.backend.entity.User;
-import com.docusphere.backend.repository.UserRepository;
+import com.docusphere.backend.Authentication.entity.User;
+import com.docusphere.backend.Authentication.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;

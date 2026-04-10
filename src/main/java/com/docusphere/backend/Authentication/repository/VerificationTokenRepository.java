@@ -1,7 +1,7 @@
-package com.docusphere.backend.repository;
+package com.docusphere.backend.Authentication.repository;
 
-import com.docusphere.backend.entity.User;
-import com.docusphere.backend.entity.VerificationToken;
+import com.docusphere.backend.Authentication.entity.User;
+import com.docusphere.backend.Authentication.entity.VerificationToken;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;

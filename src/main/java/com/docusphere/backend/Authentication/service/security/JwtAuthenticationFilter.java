@@ -1,11 +1,10 @@
-package com.docusphere.backend.service.security;
+package com.docusphere.backend.Authentication.service.security;
 
-import com.docusphere.backend.service.JwtService;
+import com.docusphere.backend.Authentication.service.JwtService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;

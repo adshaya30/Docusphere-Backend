@@ -1,7 +1,6 @@
 package com.docusphere.backend.config;
 
-import com.docusphere.backend.service.security.JwtAuthenticationFilter;
-import lombok.RequiredArgsConstructor;
+import com.docusphere.backend.Authentication.service.security.JwtAuthenticationFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;

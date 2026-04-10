@@ -1,4 +1,4 @@
-package com.docusphere.backend.service;
+package com.docusphere.backend.Authentication.service;
 
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;

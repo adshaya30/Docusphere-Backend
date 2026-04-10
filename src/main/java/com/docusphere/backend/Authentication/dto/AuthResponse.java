@@ -1,4 +1,4 @@
-package com.docusphere.backend.dto;
+package com.docusphere.backend.Authentication.dto;
 
 import lombok.*;
 

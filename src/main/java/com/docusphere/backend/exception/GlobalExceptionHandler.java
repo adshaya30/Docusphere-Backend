@@ -46,8 +46,17 @@ public class GlobalExceptionHandler {
     // Handle Authentication Failures (wrong password, user not found, etc.)
     @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<Object> handleBadCredentials(BadCredentialsException ex) {
-        return buildErrorResponse(HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS", 
-                "Invalid email or password. Please try again.");
+        // Return the specific error message from the exception
+        String message = ex.getMessage() != null ? ex.getMessage() : "Invalid email or password. Please try again.";
+        String errorCode = "INVALID_CREDENTIALS";
+        
+        if (message.contains("Email not registered")) {
+            errorCode = "EMAIL_NOT_REGISTERED";
+        } else if (message.contains("Email not verified")) {
+            errorCode = "EMAIL_NOT_VERIFIED";
+        }
+        
+        return buildErrorResponse(HttpStatus.UNAUTHORIZED, errorCode, message);
     }
 
     // Handle other authentication exceptions

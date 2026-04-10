@@ -1,4 +1,4 @@
-package com.docusphere.backend.service;
+package com.docusphere.backend.Authentication.service;
 
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
