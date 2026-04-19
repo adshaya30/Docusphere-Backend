@@ -16,7 +16,7 @@ public class EmailService {
     private final JavaMailSender mailSender;
     private final TemplateEngine templateEngine;
 
-    public void sendVerificationEmail(String to, String verificationLink) throws MessagingException {
+    public void sendVerificationEmail(@org.springframework.lang.NonNull String to, @org.springframework.lang.NonNull String verificationLink) throws MessagingException {
         MimeMessage message = mailSender.createMimeMessage();
         MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
@@ -32,7 +32,9 @@ public class EmailService {
 
         // Process template with variables
         String htmlContent = templateEngine.process("verification-email", context);
-
+        if (htmlContent == null) {
+            throw new MessagingException("Email content failed to generate");
+        }
         helper.setText(htmlContent, true);
         mailSender.send(message);
     }

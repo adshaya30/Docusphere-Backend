@@ -71,11 +71,11 @@ public class UserService {
 
         // Send verification email asynchronously (non-blocking)
         String verificationLink = appConfig.getFrontendUrl() + "/verify-email?token=" + token;
-        sendVerificationEmailAsync(user.getEmail(), verificationLink);
+        sendVerificationEmailAsync(java.util.Objects.requireNonNull(user.getEmail()), verificationLink);
     }
 
     // Send email asynchronously without blocking the response
-    private void sendVerificationEmailAsync(String email, String verificationLink) {
+    private void sendVerificationEmailAsync(@org.springframework.lang.NonNull String email, @org.springframework.lang.NonNull String verificationLink) {
         new Thread(() -> {
             try {
                 emailService.sendVerificationEmail(email, verificationLink);
@@ -156,7 +156,7 @@ public class UserService {
 
             // Send verification email asynchronously
             String verificationLink = appConfig.getFrontendUrl() + "/verify-email?token=" + token;
-            sendVerificationEmailAsync(user.getEmail(), verificationLink);
+            sendVerificationEmailAsync(java.util.Objects.requireNonNull(user.getEmail()), verificationLink);
         } catch (Exception e) {
             e.printStackTrace();
             throw e;
