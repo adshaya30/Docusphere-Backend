@@ -17,11 +17,12 @@ def extract_text(image_path):
     if result is None or len(result) == 0:
         return "No text detected in the image."
         
-    for idx in range(len(result)):
-        res = result[idx]
-        if res is None: continue
-        for line in res:
-            full_text.append(line[1][0])
+    for page in result:
+        if page is None: continue
+        for line in page:
+            if line is None or len(line) < 2: continue
+            text_element = line[1][0]
+            full_text.append(text_element)
             
     return "\n".join(full_text)
 

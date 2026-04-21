@@ -1,0 +1,4 @@
+DOCUMENT TITLE: PROJECT NEXORA
+This is a sample document for testing OCRextraction.
+It contains multiple lines of text to verify the summarization logic.
+Keywords: Nexora, OCR Docusphere, Testing.

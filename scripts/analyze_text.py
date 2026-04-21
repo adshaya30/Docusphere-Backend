@@ -1,6 +1,7 @@
 import sys
 import os
 import nltk
+import json
 from sumy.parsers.plaintext import PlaintextParser
 from sumy.nlp.tokenizers import Tokenizer
 from sumy.summarizers.lsa import LsaSummarizer
@@ -11,6 +12,7 @@ try:
     nltk.download('averaged_perceptron_tagger', quiet=True)
     nltk.download('stopwords', quiet=True)
     nltk.download('universal_tagset', quiet=True)
+    nltk.download('punkt_tab', quiet=True) # Added for newer NLTK versions
 except:
     pass
 
@@ -23,24 +25,33 @@ def generate_summary(text, count=3):
         summarizer = LsaSummarizer()
         summary = summarizer(parser.document, count)
         result = " ".join([str(sentence) for sentence in summary])
-        return result if result else "Text content is too short for a structured summary."
+        if not result:
+            # Fallback to first few sentences if summarizer returns nothing
+            sentences = text.split('.')
+            result = ". ".join([s.strip() for s in sentences[:3] if s.strip()]) + "."
+        
+        # Clean newlines
+        return result.replace('\n', ' ').strip()
     except Exception:
-        return text[:200] + "..." # Fallback to first 200 chars
+        return text[:300].replace('\n', ' ').strip() + "..."
 
 def extract_tags(text):
     if not text.strip():
         return ["Empty"]
         
     try:
+        # Simple extraction based on word frequency and POS tagging
         tokens = nltk.word_tokenize(text)
         pos_tags = nltk.pos_tag(tokens)
-        # Extract nouns (NN) and proper nouns (NNP) as candidate tags
-        keywords = [word for word, pos in pos_tags if pos.startswith('NN') and len(word) > 3]
         
-        # Filter stopwords
+        # Filter for nouns and significant words
         from nltk.corpus import stopwords
         stop_words = set(stopwords.words('english'))
-        keywords = [w.capitalize() for w in keywords if w.lower() not in stop_words]
+        
+        keywords = []
+        for word, pos in pos_tags:
+            if pos.startswith('NN') and len(word) > 3 and word.lower() not in stop_words:
+                keywords.append(word.capitalize())
         
         freq = nltk.FreqDist(keywords)
         top_tags = [word for word, count in freq.most_common(5)]
@@ -48,14 +59,34 @@ def extract_tags(text):
     except Exception:
         return ["Document"]
 
+def extract_key_points(text, count=5):
+    if not text.strip():
+        return ["No key points found."]
+        
+    try:
+        # Use sumy for key points as well but maybe with more sentences
+        parser = PlaintextParser.from_string(text, Tokenizer("english"))
+        summarizer = LsaSummarizer()
+        sentences = summarizer(parser.document, count)
+        points = [str(s).replace('\n', ' ').strip() for s in sentences]
+        
+        if not points:
+            # Fallback
+            sentences = [s.strip() for s in text.split('.') if s.strip()]
+            points = sentences[:count]
+            
+        return points
+    except Exception:
+        return ["Points could not be extracted."]
+
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Error: No file path provided")
+        print(json.dumps({"error": "No file path provided"}))
         sys.exit(1)
 
     file_path = sys.argv[1]
     if not os.path.exists(file_path):
-        print(f"Error: File {file_path} not found")
+        print(json.dumps({"error": f"File {file_path} not found"}))
         sys.exit(1)
 
     try:
@@ -63,16 +94,24 @@ if __name__ == "__main__":
             content = f.read()
 
         if not content.strip():
-            print("No text content provided.")
-            print("Empty")
+            print(json.dumps({
+                "summary": "No text content provided.",
+                "tags": ["Empty"],
+                "key_points": ["No text detected."]
+            }))
             sys.exit(0)
 
         summary = generate_summary(content)
         tags = extract_tags(content)
-
-        # Output Summary and Tags for Java to read
-        print(summary)
-        print(", ".join(tags))
+        key_points = extract_key_points(content)
+        
+        output = {
+            "summary": summary,
+            "tags": tags,
+            "keyPoints": key_points
+        }
+        print(json.dumps(output))
+        
     except Exception as e:
-        print(f"Error during analysis: {str(e)}")
+        print(json.dumps({"error": str(e)}))
         sys.exit(1)

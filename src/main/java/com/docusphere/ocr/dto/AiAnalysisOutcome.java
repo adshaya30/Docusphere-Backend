@@ -13,4 +13,5 @@ import java.util.List;
 public class AiAnalysisOutcome {
     private String summary;
     private List<String> tags;
+    private List<String> keyPoints;
 }

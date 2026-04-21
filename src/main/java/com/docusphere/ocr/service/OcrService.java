@@ -2,7 +2,7 @@ package com.docusphere.ocr.service;
 
 import com.docusphere.ocr.dto.AiAnalysisOutcome;
 import com.docusphere.ocr.dto.OcrResponse;
-import com.docusphere.ocr.model.Document;
+import com.docusphere.ocr.entity.OcrDocument;
 import com.docusphere.ocr.repository.OcrRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -33,24 +33,30 @@ public class OcrService {
             extractedText = ocrExtractionService.extractText(tempFile.toAbsolutePath().toString());
             java.nio.file.Files.deleteIfExists(tempFile);
 
+            System.out.println("--- RAW OCR OUTPUT BEGIN ---");
+            System.out.println(extractedText);
+            System.out.println("--- RAW OCR OUTPUT END ---");
+
             // 2. AI Summarization & Tagging
             AiAnalysisOutcome analysis = aiAnalysisService.analyzeText(extractedText);
 
             // 3. Save to Database
-            Document document = Document.builder()
+            OcrDocument document = OcrDocument.builder()
                     .filename(filename)
                     .rawExtractedText(extractedText)
                     .aiSummary(analysis.getSummary())
                     .tags(analysis.getTags())
+                    .keyPoints(analysis.getKeyPoints()) // Added this line
                     .build();
 
             @SuppressWarnings("null")
-            Document savedDoc = ocrRepository.save(document);
+            OcrDocument savedDoc = ocrRepository.save(document);
 
             return OcrResponse.builder()
                     .title(savedDoc.getFilename())
                     .description("AI-generated summary based on the extracted contents.")
                     .tags(savedDoc.getTags())
+                    .keyPoints(savedDoc.getKeyPoints()) // Updated to use saved document data
                     .summary(savedDoc.getAiSummary())
                     .build();
 

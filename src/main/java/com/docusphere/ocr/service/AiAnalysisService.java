@@ -1,19 +1,22 @@
 package com.docusphere.ocr.service;
 
 import com.docusphere.ocr.dto.AiAnalysisOutcome;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
-import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class AiAnalysisService {
+
+    private final ObjectMapper objectMapper;
 
     @Value("${ocr.python.executable:python}")
     private String pythonExecutable;
@@ -50,27 +53,29 @@ public class AiAnalysisService {
         } catch (Exception e) {
             log.error("AI Analysis failed: {}", e.getMessage());
             return AiAnalysisOutcome.builder()
-                    .summary("Analysis failed. Using raw text.")
+                    .summary("Analysis failed. " + e.getMessage())
                     .tags(List.of("Error"))
+                    .keyPoints(List.of("Extraction could not be completed."))
                     .build();
         }
     }
 
     private AiAnalysisOutcome parsePythonOutput(String output) {
-        String[] lines = output.split("\n");
-        // Looking for the last two lines as output
-        String summary = "No summary generated.";
-        List<String> tags = List.of("Document");
-
-        if (lines.length >= 2) {
-            summary = lines[lines.length - 2];
-            tags = Arrays.asList(lines[lines.length - 1].split(","))
-                    .stream()
-                    .map(String::trim)
-                    .filter(s -> !s.isEmpty())
-                    .collect(Collectors.toList());
+        try {
+            // Find the last JSON block in the output (in case there's logging noise)
+            int jsonStartIndex = output.lastIndexOf("{");
+            if (jsonStartIndex == -1) {
+                throw new RuntimeException("No JSON output found from Python script");
+            }
+            String jsonPart = output.substring(jsonStartIndex);
+            return objectMapper.readValue(jsonPart, AiAnalysisOutcome.class);
+        } catch (Exception e) {
+            log.error("Failed to parse Python JSON output: {}. Raw output: {}", e.getMessage(), output);
+            return AiAnalysisOutcome.builder()
+                    .summary("Failed to parse analysis results.")
+                    .tags(List.of("Error"))
+                    .keyPoints(List.of("Check backend logs for details."))
+                    .build();
         }
-
-        return new AiAnalysisOutcome(summary, tags);
     }
 }
