@@ -36,4 +36,25 @@ public class EmailService {
         helper.setText(htmlContent, true);
         mailSender.send(message);
     }
+    //Send Passwor Reset Email
+    public void sendPasswordResetEmail(String to, String resetLink) throws MessagingException {
+        MimeMessage message = mailSender.createMimeMessage();
+        MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+        helper.setTo(to);
+        helper.setSubject("Reset Your Password - DocuSphere");
+
+        String userName = to.split("@")[0];
+
+        Context context = new Context();
+        context.setVariable("userName", userName);
+        context.setVariable("resetLink", resetLink);
+        context.setVariable("expiryTime", "30 minutes");   // You can change this
+
+        String htmlContent = templateEngine.process("reset-password-email", context);
+
+        helper.setText(htmlContent, true);
+        mailSender.send(message);
+    }
+
 }

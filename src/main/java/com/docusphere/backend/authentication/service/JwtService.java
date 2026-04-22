@@ -31,24 +31,24 @@ public class JwtService {
         return Keys.hmacShaKeyFor(secretKey.getBytes());
     }
 
-    public String generateToken(UserDetails userDetails, String role) {
-        return buildToken(userDetails, role, jwtExpiration);
+    public String generateToken(UserDetails userDetails, String role, Long userId) {
+        return buildToken(userDetails, role, userId, jwtExpiration);
     }
-    public String generateToken(UserDetails userDetails, String role, boolean rememberMe) {
+    public String generateToken(UserDetails userDetails, String role, Long userId, boolean rememberMe) {
         long expiry = rememberMe ? REMEMBER_ME_EXPIRY : SESSION_EXPIRY;
-        return buildToken(userDetails, role, expiry);
+        return buildToken(userDetails, role, userId, expiry);
     }
 
-    //Generate JWT Token with Role
-    private String buildToken(UserDetails userDetails, String role, long expiry) {
+    private String buildToken(UserDetails userDetails, String role, Long userId, long expiry) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("role", role);
+        claims.put("userId", userId);
 
         return Jwts.builder()
                 .setClaims(claims)
                 .setSubject(userDetails.getUsername())
                 .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + jwtExpiration))
+                .setExpiration(new Date(System.currentTimeMillis() + expiry))
                 .signWith(getSigningKey())
                 .compact();
     }
@@ -67,6 +67,14 @@ public class JwtService {
                 .parseSignedClaims(token)
                 .getPayload()
                 .get("role", String.class);
+    }
+    public Long extractUserId(String token) {
+        return Jwts.parser()
+                .verifyWith(getSigningKey())
+                .build()
+                .parseSignedClaims(token)
+                .getPayload()
+                .get("userId", Long.class);
     }
     public boolean isTokenValid(String token, UserDetails userDetails) {
         final String username = extractUsername(token);
