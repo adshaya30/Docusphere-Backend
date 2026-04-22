@@ -1,0 +1,39 @@
+{
+  "properties": [
+    {
+      "name": "ocr.python.executable",
+      "type": "java.lang.String",
+      "description": "Path to the Python executable used for OCR processing."
+    },
+    {
+      "name": "ocr.python.script.path",
+      "type": "java.lang.String",
+      "description": "Path to the PaddleOCR Python script."
+    },
+    {
+      "name": "ocr.analysis.script.path",
+      "type": "java.lang.String",
+      "description": "Path to the AI Text Analysis Python script."
+    },
+    {
+      "name": "jwt.secret",
+      "type": "java.lang.String",
+      "description": "Base64 encoded secret key for JWT signing."
+    },
+    {
+      "name": "jwt.expiration",
+      "type": "java.lang.Long",
+      "description": "Expiration time for JWT tokens in milliseconds."
+    },
+    {
+      "name": "app.session.expiry",
+      "type": "java.lang.Long",
+      "description": "Default session expiration time in milliseconds."
+    },
+    {
+      "name": "app.session.remember-me-expiry",
+      "type": "java.lang.Long",
+      "description": "Remember-me session expiration time in milliseconds."
+    }
+  ]
+}
