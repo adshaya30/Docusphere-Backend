@@ -1,4 +1,4 @@
-package com.docusphere.backend.Common.config;
+package com.docusphere.backend.common.config;
 
 import lombok.Getter;
 import org.springframework.beans.factory.annotation.Value;

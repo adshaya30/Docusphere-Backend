@@ -1,4 +1,4 @@
-package com.docusphere.backend.Common.exception;
+package com.docusphere.backend.common.exception;
 
 public class UserNotFoundException extends RuntimeException {
 

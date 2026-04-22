@@ -1,4 +1,4 @@
-package com.docusphere.backend.Common.response;
+package com.docusphere.backend.common.response;
 
 import lombok.*;
 
