@@ -1,6 +1,6 @@
-package com.docusphere.ocr.repository;
+package com.docusphere.backend.ocr.repository;
 
-import com.docusphere.ocr.entity.OcrDocument;
+import com.docusphere.backend.ocr.entity.OcrDocument;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

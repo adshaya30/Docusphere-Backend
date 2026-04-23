@@ -1,6 +1,6 @@
-package com.docusphere.ocr.service;
+package com.docusphere.backend.ocr.service;
 
-import com.docusphere.ocr.dto.AiAnalysisOutcome;
+import com.docusphere.backend.ocr.dto.AiAnalysisOutcome;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

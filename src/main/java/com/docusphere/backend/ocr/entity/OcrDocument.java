@@ -1,4 +1,4 @@
-package com.docusphere.ocr.entity;
+package com.docusphere.backend.ocr.entity;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;

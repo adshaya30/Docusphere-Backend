@@ -1,4 +1,4 @@
-package com.docusphere.ocr.dto;
+package com.docusphere.backend.ocr.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
