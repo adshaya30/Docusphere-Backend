@@ -1,22 +1,21 @@
 package com.docusphere.backend.authentication.service;
 
-import com.docusphere.backend.common.config.AdminConfig;
-import com.docusphere.backend.common.config.AppConfig;
+import com.docusphere.backend.Common.config.AdminConfig;
+import com.docusphere.backend.Common.config.AppConfig;
 import com.docusphere.backend.authentication.dto.SignUpRequest;
 import com.docusphere.backend.authentication.dto.ResetPasswordRequest;
 import com.docusphere.backend.authentication.entity.Role;
 import com.docusphere.backend.authentication.entity.User;
 import com.docusphere.backend.authentication.entity.VerificationToken;
 import com.docusphere.backend.authentication.entity.PasswordResetToken;
-import com.docusphere.backend.common.exception.*;
+import com.docusphere.backend.Common.exception.*;
+import com.docusphere.backend.Common.exception.EmailNotVerifiedException;
 import com.docusphere.backend.authentication.repository.PasswordResetTokenRepository;
 import com.docusphere.backend.authentication.repository.RoleRepository;
 import com.docusphere.backend.authentication.repository.UserRepository;
 import com.docusphere.backend.authentication.repository.VerificationTokenRepository;
+import jakarta.mail.MessagingException;
 import lombok.RequiredArgsConstructor;
-import java.util.Objects;
-
-
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -72,9 +71,20 @@ public class UserService {
         verificationToken.setExpiryDate(LocalDateTime.now().plusHours(24));
         tokenRepository.save(verificationToken);
 
-        // Send verification email
+        // Send verification email asynchronously
         String verificationLink = appConfig.getFrontendUrl() + "/verify-email?token=" + token;
-        emailService.sendVerificationEmail(Objects.requireNonNull(user.getEmail()), verificationLink);
+        sendVerificationEmailAsync(user.getEmail(), verificationLink);
+    }
+
+    // Send email asynchronously without blocking the response
+    private void sendVerificationEmailAsync(String email, String verificationLink) {
+        new Thread(() -> {
+            try {
+                emailService.sendVerificationEmail(email, verificationLink);
+            } catch (MessagingException e) {
+                log.error("Failed to send verification email to: {}", email, e);
+            }
+        }).start();
     }
 
     // This ensures roles are saved even if the main signup transaction fails
@@ -93,6 +103,23 @@ public class UserService {
         return userRepository.findByEmail(email.toLowerCase())
                 .orElseThrow(() ->
                         new UserNotFoundException("User not found with email: " + email));
+    }
+
+    @Transactional
+    public User verifyEmail(String token) {
+
+        VerificationToken vt = tokenRepository.findByToken(token)
+                .orElseThrow(() -> new InvalidTokenException("Invalid token"));
+
+        if (vt.isExpired()) {
+            throw new TokenExpiredException("Token has expired");
+        }
+
+        User user = vt.getUser();
+        user.setEnabled(true);
+        userRepository.save(user);
+        tokenRepository.delete(vt);
+        return user;
     }
 
     @Transactional
@@ -118,30 +145,12 @@ public class UserService {
 
             tokenRepository.save(verificationToken);
             String verificationLink = appConfig.getFrontendUrl() + "/verify-email?token=" + token;
-            emailService.sendVerificationEmail(Objects.requireNonNull(user.getEmail()), verificationLink);
+            sendVerificationEmailAsync(user.getEmail(), verificationLink);
         } catch (Exception e) {
             log.error("Error during email resend process: ", e);
             throw e;
         }
     }
-
-    @Transactional
-    public User verifyEmail(String token) {
-
-        VerificationToken vt = tokenRepository.findByToken(token)
-                .orElseThrow(() -> new InvalidTokenException("Invalid token"));
-
-        if (vt.isExpired()) {
-            throw new TokenExpiredException("Token has expired");
-        }
-
-        User user = vt.getUser();
-        user.setEnabled(true);
-        userRepository.save(user);
-        tokenRepository.delete(vt);
-        return user;
-    }
-
 
     private boolean isAdminEmail(String email) {
         return adminConfig.getAdminEmails().stream()
@@ -180,7 +189,7 @@ public class UserService {
         new Thread(() -> {
             try {
                 emailService.sendPasswordResetEmail(email, resetLink);
-            } catch (jakarta.mail.MessagingException e) {
+            } catch (MessagingException e) {
                 log.error("Failed to send password reset email to: {}", email, e);
             }
         }).start();
@@ -219,3 +228,6 @@ public class UserService {
         passwordResetTokenRepository.delete(resetToken);
     }
 }
+
+
+

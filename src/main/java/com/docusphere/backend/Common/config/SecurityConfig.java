@@ -1,4 +1,4 @@
-package com.docusphere.backend.common.config;
+package com.docusphere.backend.Common.config;
 
 import com.docusphere.backend.authentication.service.security.JwtAuthenticationFilter;
 import org.springframework.context.annotation.Bean;
@@ -46,7 +46,6 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/", "/error", "/favicon.ico").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
-                        .requestMatchers("/api/ocr/**").permitAll()
                         .requestMatchers("/admin/**").hasRole("ADMIN")
                         .requestMatchers("/user/**").hasAnyRole("USER", "ADMIN")
                         .anyRequest().authenticated()
@@ -61,17 +60,13 @@ public class SecurityConfig {
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
-        System.out.println("CORS Allowed Origins: " + appConfig.getFrontendUrl());
         CorsConfiguration configuration = new CorsConfiguration();
-        
-        // Handle comma-separated list of origins
-        String[] origins = appConfig.getFrontendUrl().split(",");
-        configuration.setAllowedOrigins(Arrays.asList(origins));
-        
+        configuration.setAllowedOrigins(Arrays.asList(
+                appConfig.getFrontendUrl()    // Use configured frontend URL from AppConfig
+        ));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
         configuration.setAllowCredentials(true);
-
         
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);

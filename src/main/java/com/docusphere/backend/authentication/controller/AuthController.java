@@ -1,7 +1,7 @@
 package com.docusphere.backend.authentication.controller;
 
-import com.docusphere.backend.common.response.AuthResponse;
-import com.docusphere.backend.common.response.MessageResponse;
+import com.docusphere.backend.Common.response.AuthResponse;
+import com.docusphere.backend.Common.response.MessageResponse;
 import com.docusphere.backend.authentication.dto.SignInRequest;
 import com.docusphere.backend.authentication.dto.SignUpRequest;
 import com.docusphere.backend.authentication.dto.ForgotPasswordRequest;
@@ -10,7 +10,7 @@ import com.docusphere.backend.authentication.entity.User;
 import com.docusphere.backend.authentication.service.JwtService;
 import com.docusphere.backend.authentication.service.UserService;
 import com.docusphere.backend.authentication.service.security.CustomUserDetailsService;
-import com.docusphere.backend.common.exception.UserNotFoundException;
+import com.docusphere.backend.Common.exception.UserNotFoundException;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

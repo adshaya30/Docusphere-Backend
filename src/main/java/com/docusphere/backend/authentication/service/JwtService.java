@@ -26,14 +26,9 @@ public class JwtService {
     private long REMEMBER_ME_EXPIRY;
 
 
+    //Creates the signing key from the secret
     private SecretKey getSigningKey() {
         return Keys.hmacShaKeyFor(secretKey.getBytes());
-    }
-
-    private JwtParser getParser() {
-        return Jwts.parser()
-                .verifyWith(getSigningKey())
-                .build();
     }
 
     public String generateToken(UserDetails userDetails, String role, Long userId) {
@@ -50,21 +45,25 @@ public class JwtService {
         claims.put("userId", userId);
 
         return Jwts.builder()
-                .claims(claims)
-                .subject(userDetails.getUsername())
-                .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis() + expiry))
+                .setClaims(claims)
+                .setSubject(userDetails.getUsername())
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + expiry))
                 .signWith(getSigningKey())
                 .compact();
     }
     public String extractUsername(String token) {
-        return getParser()
+        return Jwts.parser()
+                .verifyWith(getSigningKey())
+                .build()
                 .parseSignedClaims(token)
                 .getPayload()
                 .getSubject();
     }
     public String extractRole(String token) {
-        return getParser()
+        return Jwts.parser()
+                .verifyWith(getSigningKey())
+                .build()
                 .parseSignedClaims(token)
                 .getPayload()
                 .get("role", String.class);
@@ -83,11 +82,12 @@ public class JwtService {
     }
     //Check if token is expired
     private boolean isTokenExpired(String token) {
-        return getParser()
+        return Jwts.parser()
+                .verifyWith(getSigningKey())
+                .build()
                 .parseSignedClaims(token)
                 .getPayload()
                 .getExpiration()
                 .before(new Date());
     }
-
 }
