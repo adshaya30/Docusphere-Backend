@@ -65,6 +65,30 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(HttpStatus.UNAUTHORIZED, "AUTHENTICATION_FAILED",
                 "Authentication failed. Please check your credentials.");
     }
+    // Handle Document Not Found
+    @ExceptionHandler(DocumentNotFoundException.class)
+    public ResponseEntity<Object> handleDocumentNotFound(DocumentNotFoundException ex) {
+        return buildErrorResponse(HttpStatus.NOT_FOUND, "DOCUMENT_NOT_FOUND", ex.getMessage());
+    }
+
+    // Handle File Upload Error
+    @ExceptionHandler(FileUploadException.class)
+    public ResponseEntity<Object> handleFileUploadException(FileUploadException ex) {
+        return buildErrorResponse(HttpStatus.BAD_REQUEST, "FILE_UPLOAD_ERROR", ex.getMessage());
+    }
+
+    // Handle Invalid Request
+    @ExceptionHandler(InvalidRequestException.class)
+    public ResponseEntity<Object> handleInvalidRequest(InvalidRequestException ex) {
+        return buildErrorResponse(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", ex.getMessage());
+    }
+
+    // Handle Unauthorized Access
+    @ExceptionHandler(UnauthorizedAccessException.class)
+    public ResponseEntity<Object> handleUnauthorizedAccess(UnauthorizedAccessException ex) {
+        return buildErrorResponse(HttpStatus.FORBIDDEN, "UNAUTHORIZED_ACCESS", ex.getMessage());
+    }
+
 
     // Handle any other unexpected exceptions
     @ExceptionHandler(Exception.class)
