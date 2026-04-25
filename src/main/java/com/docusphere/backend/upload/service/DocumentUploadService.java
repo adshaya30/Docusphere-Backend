@@ -190,7 +190,6 @@ public class DocumentUploadService {
                     .sizeBytes((long) mergedFile.length())
                     .ownerId(ownerId)
                     .teamId(teamId)
-                    .storagePath(storageKey)
                     .storageKey(storageKey)
                     .fileUrl(fileUrl)
                     .status(Document.UploadStatus.COMPLETED)
