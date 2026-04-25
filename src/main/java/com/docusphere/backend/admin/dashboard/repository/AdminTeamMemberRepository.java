@@ -1,6 +1,6 @@
 package com.docusphere.backend.admin.dashboard.repository;
 
-import com.docusphere.backend.team.TeamMember;
+import com.docusphere.backend.team.entity.TeamMember;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
