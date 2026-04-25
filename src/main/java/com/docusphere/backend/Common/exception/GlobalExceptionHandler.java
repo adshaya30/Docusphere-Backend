@@ -8,6 +8,7 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
@@ -82,6 +83,24 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Object> handleInvalidRequest(InvalidRequestException ex) {
         return buildErrorResponse(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", ex.getMessage());
     }
+
+    // Handle @Valid payload errors (RenameRequest, MoveRequest validation failures)
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<Object> handleMethodArgumentNotValid(MethodArgumentNotValidException ex) {
+        String message = ex.getBindingResult().getFieldErrors().stream()
+                .findFirst()
+                .map(error -> error.getField() + ": " + error.getDefaultMessage())
+                .orElse("Validation failed");
+        return buildErrorResponse(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", message);
+    }
+
+    // Handle invalid method arguments ( malformed UUID conversions, illegal enum/value parsing)
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<Object> handleIllegalArgumentException(IllegalArgumentException ex) {
+        return buildErrorResponse(HttpStatus.BAD_REQUEST, "INVALID_ARGUMENT", ex.getMessage());
+    }
+
 
     // Handle Unauthorized Access
     @ExceptionHandler(UnauthorizedAccessException.class)

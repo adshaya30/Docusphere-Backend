@@ -37,13 +37,16 @@ public class Document {
 	private UUID teamId;
 
 	@Column(nullable = false)
-	private String storagePath;
-
-	@Column(nullable = false)
 	private String storageKey;
 
 	@Column(nullable = false)
 	private String fileUrl;
+
+	@Column(nullable = false)
+	private boolean deleted = false;
+
+	@Column(name = "deleted_at")
+	private LocalDateTime deletedAt;
 
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false)
