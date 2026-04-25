@@ -90,6 +90,12 @@ public class GlobalExceptionHandler {
     }
 
 
+    // Handle Admin Dashboard Error
+    @ExceptionHandler(AdminDashboardException.class)
+    public ResponseEntity<Object> handleAdminDashboardException(AdminDashboardException ex) {
+        return buildErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR, "ADMIN_DASHBOARD_ERROR", ex.getMessage());
+    }
+
     // Handle any other unexpected exceptions
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Object> handleGlobalException(Exception ex) {
