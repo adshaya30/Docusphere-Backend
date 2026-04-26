@@ -1,29 +1,38 @@
 package com.docusphere.backend.team.entity;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import org.hibernate.annotations.GenericGenerator;
+import lombok.*;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "team")
+@Table(
+    name = "team",
+    uniqueConstraints = {
+        @UniqueConstraint(name = "team_team_name_key", columnNames = "team_name")
+    }
+)
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class Team {
 
     @Id
-    @GeneratedValue(generator = "UUID")
-    @GenericGenerator(
-            name = "UUID",
-            strategy = "org.hibernate.id.UUIDGenerator"
-    )
-    @Column(updatable = false, nullable = false)
+    @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
+
+    @Column(name = "team_name", nullable = false)
+    private String teamName;
+
+    @Column(columnDefinition = "TEXT")
+    private String description;
+
+    @Column(name = "member_count", nullable = false)
+    private Integer memberCount = 0;
+
+    @Column(name = "document_count", nullable = false)
+    private Integer documentCount = 0;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -31,26 +40,20 @@ public class Team {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    @Column(columnDefinition = "TEXT")
-    private String description;
-
-    @Column(name = "team_name", nullable=false)
-    private String teamName;
-
-    @Column(name = "document_count")
-    private Integer documentCount;
-
-    @Column(name = "member_count" ,nullable = false)
-    private Integer memberCount;
-
-    // Automatically set created_at before insert
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
+
+        if (this.memberCount == null) {
+            this.memberCount = 0;
+        }
+
+        if (this.documentCount == null) {
+            this.documentCount = 0;
+        }
     }
 
-    // Automatically update updated_at before update
     @PreUpdate
     protected void onUpdate() {
         this.updatedAt = LocalDateTime.now();

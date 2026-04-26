@@ -1,6 +1,5 @@
 package com.docusphere.backend.team.entity;
 
-import com.docusphere.backend.authentication.entity.User;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -15,56 +14,66 @@ import java.util.UUID;
 public class TeamMember {
 
     @Id
-    @GeneratedValue
+    @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
+    // 🔥 Many members belong to one team
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "team_id", nullable = false)
     private Team team;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
+    @Column(name = "user_id", nullable = false)
+    private Long userId;
+
+    @Column(name = "full_name", nullable = false)
+    private String fullName;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "role", nullable = false, length = 20)
+    private TeamRole role;
 
     @Column(name = "last_seen", nullable = false)
     private LocalDateTime lastSeen;
 
-    @Column(nullable = false)
-    private boolean active = true;
-
-    @Column(name = "joined_at", nullable = false, updatable = false)
+    @Column(name = "joined_at", nullable = false)
     private LocalDateTime joinedAt;
-
-    // 🔥 Enum INSIDE entity
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private TeamRole role;
 
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-    // 🔁 timestamps
+    @Column(name = "created_at", nullable = false)
+    private LocalDateTime createdAt;
+
+    @Column(name = "active")
+    private Boolean active;
+
+    @Column(name = "permissions", length = 255)
+    private String permissions;
+
+    @Column(name = "metadata", columnDefinition = "TEXT")
+    private String metadata;
+
+    // 🔥 Auto timestamps
     @PrePersist
     protected void onCreate() {
-        this.joinedAt = LocalDateTime.now();
+        this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
-        this.lastSeen = LocalDateTime.now();
 
-        // default role if not set
-        if (this.role == null) {
-            this.role = TeamRole.MEMBER;
+        if (this.joinedAt == null) {
+            this.joinedAt = LocalDateTime.now();
+        }
+
+        if (this.lastSeen == null) {
+            this.lastSeen = LocalDateTime.now();
+        }
+
+        if (this.active == null) {
+            this.active = true;
         }
     }
 
     @PreUpdate
     protected void onUpdate() {
         this.updatedAt = LocalDateTime.now();
-    }
-
-    // 🔥 Enum INSIDE SAME FILE
-    public enum TeamRole {
-        MEMBER,
-        MANAGER,
-        LEADER
     }
 }
