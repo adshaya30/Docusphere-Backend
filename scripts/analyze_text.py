@@ -2,120 +2,91 @@ import sys
 import os
 import nltk
 import json
+import math
 from sumy.parsers.plaintext import PlaintextParser
 from sumy.nlp.tokenizers import Tokenizer
-from sumy.summarizers.lsa import LsaSummarizer
+from sumy.summarizers.text_rank import TextRankSummarizer
 
-# Check for required NLTK data to avoid network overhead on every run
+# Essential NLTK data
 try:
     nltk.data.find('tokenizers/punkt')
-    nltk.data.find('taggers/averaged_perceptron_tagger')
     nltk.data.find('corpora/stopwords')
-    nltk.data.find('taggers/universal_tagset')
-    nltk.data.find('tokenizers/punkt_tab')
 except LookupError:
     try:
         nltk.download('punkt', quiet=True)
-        nltk.download('averaged_perceptron_tagger', quiet=True)
         nltk.download('stopwords', quiet=True)
-        nltk.download('universal_tagset', quiet=True)
-        nltk.download('punkt_tab', quiet=True)
     except:
         pass
 
-def generate_summary(text, count=3):
-    if not text.strip():
-        return "Not enough text to generate a summary."
-        
+def generate_full_summary(text):
+    """
+    Produces a DEEP and COMPLETE summary by picking a high volume 
+    of representative sentences across the entire document.
+    """
+    words = text.split()
+    word_count = len(words)
+    
+    # Scale summary length based on document size to ensure "completeness"
+    # For a large document, we want at least 15-20 sentences.
+    target_sentences = max(10, min(25, word_count // 40))
+    
     try:
         parser = PlaintextParser.from_string(text, Tokenizer("english"))
-        summarizer = LsaSummarizer()
-        summary = summarizer(parser.document, count)
+        summarizer = TextRankSummarizer()
+        # TextRank is slower but much higher quality for long documents
+        summary = summarizer(parser.document, target_sentences)
+        
         result = " ".join([str(sentence) for sentence in summary])
-        if not result:
-            # Fallback to first few sentences if summarizer returns nothing
-            sentences = text.split('.')
-            result = ". ".join([s.strip() for s in sentences[:3] if s.strip()]) + "."
-        
-        # Clean newlines
-        return result.replace('\n', ' ').strip()
-    except Exception:
-        return text[:300].replace('\n', ' ').strip() + "..."
+        return result.strip()
+    except:
+        # Fallback to a large chunk of text if summarizer fails
+        sentences = text.split('.')
+        return ". ".join(sentences[:target_sentences]) + "."
 
-def extract_tags(text):
-    if not text.strip():
-        return ["Empty"]
-        
+def extract_detailed_key_points(text):
+    """
+    Extracts up to 15 key points to match the "Image 1" quality.
+    """
     try:
-        # Simple extraction based on word frequency and POS tagging
-        tokens = nltk.word_tokenize(text)
-        pos_tags = nltk.pos_tag(tokens)
-        
-        # Filter for nouns and significant words
-        from nltk.corpus import stopwords
-        stop_words = set(stopwords.words('english'))
-        
-        keywords = []
-        for word, pos in pos_tags:
-            if pos.startswith('NN') and len(word) > 3 and word.lower() not in stop_words:
-                keywords.append(word.capitalize())
-        
-        freq = nltk.FreqDist(keywords)
-        top_tags = [word for word, count in freq.most_common(5)]
-        return top_tags if top_tags else ["Document"]
-    except Exception:
-        return ["Document"]
-
-def extract_key_points(text, count=5):
-    if not text.strip():
-        return ["No key points found."]
-        
-    try:
-        # Use sumy for key points as well but maybe with more sentences
         parser = PlaintextParser.from_string(text, Tokenizer("english"))
-        summarizer = LsaSummarizer()
-        sentences = summarizer(parser.document, count)
-        points = [str(s).replace('\n', ' ').strip() for s in sentences]
+        summarizer = TextRankSummarizer()
+        sentences = summarizer(parser.document, 15)
         
-        if not points:
-            # Fallback
-            sentences = [s.strip() for s in text.split('.') if s.strip()]
-            points = sentences[:count]
-            
-        return points
-    except Exception:
-        return ["Points could not be extracted."]
+        points = []
+        for s in sentences:
+            p = str(s).strip()
+            # Ensure points are long and informative
+            if len(p) > 40 and p not in points:
+                points.append(p)
+                
+        return points[:12]
+    except:
+        return ["Details could not be extracted."]
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print(json.dumps({"error": "No file path provided"}))
-        sys.exit(1)
+    if len(sys.argv) < 2: sys.exit(1)
 
     file_path = sys.argv[1]
-    if not os.path.exists(file_path):
-        print(json.dumps({"error": f"File {file_path} not found"}))
-        sys.exit(1)
-
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
             content = f.read()
 
-        if not content.strip():
-            print(json.dumps({
-                "summary": "No text content provided.",
-                "tags": ["Empty"],
-                "key_points": ["No text detected."]
-            }))
-            sys.exit(0)
-
-        summary = generate_summary(content)
-        tags = extract_tags(content)
-        key_points = extract_key_points(content)
+        # Generate High-Volume Output
+        summary = generate_full_summary(content)
+        key_points = extract_detailed_key_points(content)
+        tags = [w.capitalize() for w in nltk.word_tokenize(content) if len(w) > 6 and w.isalnum()][:8]
         
+        word_count = len(content.split())
+        reading_time = math.ceil(word_count / 200)
+
         output = {
             "summary": summary,
             "tags": tags,
-            "keyPoints": key_points
+            "keyPoints": key_points,
+            "metadata": {
+                "wordCount": word_count,
+                "readingTime": f"{reading_time} min read"
+            }
         }
         print(json.dumps(output))
         

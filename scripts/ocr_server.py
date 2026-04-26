@@ -102,7 +102,7 @@ def extract_key_points(text):
     try:
         # Key points count dynamic, max 15
         sentences = [s for s in text.split('  ') if s.strip()]
-        point_count = max(6, min(15, len(sentences) // 6))
+        point_count = max(10, min(15, len(sentences) // 5))
         
         parser = PlaintextParser.from_string(text, Tokenizer("english"))
         summarizer = LexRankSummarizer()
@@ -113,6 +113,57 @@ def extract_key_points(text):
         return points
     except Exception:
         return ["Points could not be extracted."]
+
+@app.route('/extract', methods=['POST'])
+def extract():
+    data = request.get_json()
+    if not data or 'image_path' not in data:
+        return jsonify({"error": "No image_path provided"}), 400
+
+    image_path = data['image_path']
+    if not os.path.exists(image_path):
+        return jsonify({"error": f"File {image_path} not found"}), 404
+
+    try:
+        result = ocr.ocr(image_path)
+        full_text_list = []
+        if result and len(result) > 0:
+            for page in result:
+                if page is None: continue
+                for line in page:
+                    if line is None or len(line) < 2: continue
+                    if line[1][1] > 0.5:
+                        full_text_list.append(line[1][0])
+        
+        extracted_text = clean_and_join_text(full_text_list)
+        return jsonify({"extractedText": extracted_text})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/analyze', methods=['POST'])
+def analyze():
+    data = request.get_json()
+    if not data or 'text' not in data:
+        return jsonify({"error": "No text provided"}), 400
+
+    extracted_text = data['text']
+    try:
+        summary = generate_summary(extracted_text)
+        tags = extract_tags(extracted_text)
+        key_points = extract_key_points(extracted_text)
+        
+        word_count = len(extracted_text.split())
+        reading_time = max(1, word_count // 200)
+
+        return jsonify({
+            "summary": summary,
+            "tags": tags,
+            "keyPoints": key_points,
+            "wordCount": word_count,
+            "readingTime": reading_time
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/process', methods=['POST'])
 def process():

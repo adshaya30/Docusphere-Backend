@@ -20,24 +20,64 @@ public class OcrService {
     private final OcrRepository ocrRepository;
     private final PythonServiceCaller pythonServiceCaller;
     private final OcrJobManager ocrJobManager;
+    private final OcrUploadService ocrUploadService;
+
+    @Async
+    public void processFileAsync(java.io.File file, String jobId, String uploadSessionId) {
+        String filename = file.getName();
+        try {
+            // STEP 2: EXTRACTING
+            ocrJobManager.updateJob(jobId, "EXTRACTING", 30);
+            String extractedText = pythonServiceCaller.extractText(file.getAbsolutePath());
+            
+            // STEP 3: SUMMARIZING
+            ocrJobManager.updateJobWithPartial(jobId, "SUMMARIZING", 70, extractedText);
+            PythonServiceCaller.ProcessResult result = pythonServiceCaller.analyzeText(extractedText);
+            
+            OcrResponse response = OcrResponse.builder()
+                    .title(filename)
+                    .description("AI-generated summary based on the extracted contents.")
+                    .tags(result.getTags())
+                    .keyPoints(result.getKeyPoints())
+                    .summary(result.getSummary())
+                    .build();
+
+            AiAnalysisOutcome analysis = AiAnalysisOutcome.builder()
+                    .summary(result.getSummary())
+                    .tags(result.getTags())
+                    .keyPoints(result.getKeyPoints())
+                    .build();
+
+            saveDocumentAsync(filename, extractedText, analysis);
+            ocrJobManager.completeJob(jobId, response);
+            
+        } catch (Exception e) {
+            log.error("Async OCR processing failed for {}: {}", filename, e.getMessage());
+            ocrJobManager.failJob(jobId, e.getMessage());
+        } finally {
+            // Cleanup the temporary local file and session
+            if (uploadSessionId != null) {
+                ocrUploadService.cleanup(uploadSessionId);
+            }
+        }
+    }
 
     @Async
     public void processDocumentAsync(MultipartFile file, String jobId) {
         String filename = file.getOriginalFilename();
         try {
-            // 1. Uploading step (already started)
             ocrJobManager.updateJob(jobId, "EXTRACTING", 30);
             
             Path tempFile = Files.createTempFile("ocr_async_", "_" + filename);
             file.transferTo(tempFile.toFile());
 
-            // 2. Extracting & Summarizing (Combined in persistent service)
-            // We can split the updates to make it feel more real
+            // STEP 2: EXTRACTING
             ocrJobManager.updateJob(jobId, "EXTRACTING", 50);
+            String extractedText = pythonServiceCaller.extractText(tempFile.toAbsolutePath().toString());
             
-            PythonServiceCaller.ProcessResult result = pythonServiceCaller.processDocument(tempFile.toAbsolutePath().toString());
-            
-            ocrJobManager.updateJob(jobId, "SUMMARIZING", 80);
+            // STEP 3: SUMMARIZING
+            ocrJobManager.updateJobWithPartial(jobId, "SUMMARIZING", 80, extractedText);
+            PythonServiceCaller.ProcessResult result = pythonServiceCaller.analyzeText(extractedText);
             
             Files.deleteIfExists(tempFile);
 
@@ -56,7 +96,7 @@ public class OcrService {
                     .build();
 
             // Save to DB
-            saveDocumentAsync(filename, result.getExtractedText(), analysis);
+            saveDocumentAsync(filename, extractedText, analysis);
             
             // Mark Job as Completed
             ocrJobManager.completeJob(jobId, response);

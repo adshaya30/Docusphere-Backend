@@ -1,6 +1,3 @@
-# Set working directory to script location
-Set-Location $PSScriptRoot
-
 # Read the .env file and set environment variables
 Get-Content .env | ForEach-Object {
     $line = $_.Trim()
@@ -31,16 +28,8 @@ foreach ($port in $ports) {
 
 # Start the Python OCR Service
 Write-Host "Starting Python OCR Service on port 5000..." -ForegroundColor Cyan
-if (Test-Path ".\venv\Scripts\python.exe") {
-    Start-Process -FilePath ".\venv\Scripts\python.exe" -ArgumentList "`"scripts/ocr_server.py`"" -WindowStyle Hidden
-} else {
-    Write-Host "Python venv not found. Please ensure it exists." -ForegroundColor Red
-}
+Start-Process -FilePath ".\venv\Scripts\python.exe" -ArgumentList "`"scripts/ocr_server.py`"" -WindowStyle Hidden
 
 # Run the Spring Boot backend
 Write-Host "Starting Spring Boot Backend..." -ForegroundColor Green
-if (Test-Path ".\mvnw.cmd") {
-    .\mvnw.cmd spring-boot:run
-} else {
-    mvn spring-boot:run
-}
+./mvnw spring-boot:run

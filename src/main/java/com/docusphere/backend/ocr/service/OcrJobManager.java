@@ -17,6 +17,8 @@ public class OcrJobManager {
         private String jobId;
         private String status; // UPLOADING, EXTRACTING, SUMMARIZING, COMPLETED, FAILED
         private int progress;
+        private long startTime;
+        private String partialExtractedText;
         private OcrResponse result;
         private String error;
     }
@@ -29,6 +31,7 @@ public class OcrJobManager {
                 .jobId(jobId)
                 .status("UPLOADING")
                 .progress(10)
+                .startTime(System.currentTimeMillis())
                 .build());
         return jobId;
     }
@@ -36,8 +39,21 @@ public class OcrJobManager {
     public void updateJob(String jobId, String status, int progress) {
         JobStatus job = jobs.get(jobId);
         if (job != null) {
+            // Reset start time when moving from uploading to actual analysis (EXTRACTING)
+            if ("EXTRACTING".equals(status) && "UPLOADING".equals(job.getStatus())) {
+                job.setStartTime(System.currentTimeMillis());
+            }
             job.setStatus(status);
             job.setProgress(progress);
+        }
+    }
+
+    public void updateJobWithPartial(String jobId, String status, int progress, String partialText) {
+        JobStatus job = jobs.get(jobId);
+        if (job != null) {
+            job.setStatus(status);
+            job.setProgress(progress);
+            job.setPartialExtractedText(partialText);
         }
     }
 
