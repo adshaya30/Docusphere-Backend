@@ -19,4 +19,6 @@ public interface DocumentStarRepository extends JpaRepository<DocumentStar, UUID
 
     void deleteByUserIdAndDocumentId(Long userId, UUID documentId);
 
+    long countByUserId(Long userId);
+
 }
