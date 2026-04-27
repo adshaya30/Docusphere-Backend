@@ -12,8 +12,8 @@ import java.util.UUID;
 public interface AdminTeamMemberRepository extends JpaRepository<TeamMember, UUID> {
 
     // Count active members across all teams
-    @Query(value = "SELECT COUNT(*) FROM team_members WHERE active = true", nativeQuery = true)
-    Long countByActiveTrue();
+    @Query(value = "SELECT COUNT(DISTINCT user_id) FROM team_members WHERE active = true", nativeQuery = true)
+    Long countDistinctActiveUsers();
 
     // Top teams by total members and activity percentage using native query
     @Query(value = """

@@ -50,9 +50,10 @@ public class AdminDashboardService {
             // Fallback to active team members if sessions are 0 or query failed
             if (activeSessionsCount == null || activeSessionsCount == 0) {
                 try {
-                    activeSessionsCount = teamMemberRepository.countByActiveTrue();
-                    logger.info("Falling back to active team members count: {}", activeSessionsCount);
-                } catch (Exception e) {
+                   activeSessionsCount = teamMemberRepository.countDistinctActiveUsers();
+                    logger.info("Falling back to unique active team members count: {}", activeSessionsCount);
+                } 
+                 catch (Exception e) {
                     logger.warn("Could not fetch active members count: {}", e.getMessage());
                 }
             }
