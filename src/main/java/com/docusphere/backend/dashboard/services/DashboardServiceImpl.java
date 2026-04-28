@@ -1,42 +1,46 @@
 package com.docusphere.backend.dashboard.services;
 
-import com.docusphere.backend.dashboard.dto.DashboardResponse;
-import com.docusphere.backend.document.entity.Document;
-import com.docusphere.backend.document.repository.DocumentRepository;
-import com.docusphere.backend.documentStar.repository.DocumentStarRepository;
-import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
+import com.docusphere.backend.dashboard.dto.DashboardResponse;
 
 @Service
 public class DashboardServiceImpl implements DashboardService {
 
-    private final DocumentRepository documentRepository;
-    private final DocumentStarRepository documentStarRepository;
-
-    public DashboardServiceImpl(DocumentRepository documentRepository, DocumentStarRepository documentStarRepository) {
-        this.documentRepository = documentRepository;
-        this.documentStarRepository = documentStarRepository;
-    }
+    @jakarta.persistence.PersistenceContext
+    private jakarta.persistence.EntityManager entityManager;
 
     @Override
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public DashboardResponse getDashboard(Long ownerId, int recentDays) {
         int safeRecentDays = Math.max(1, recentDays);
-        LocalDateTime recentThreshold = LocalDateTime.now().minusDays(safeRecentDays);
+        java.time.LocalDateTime recentThreshold = java.time.LocalDateTime.now().minusDays(safeRecentDays);
 
-        long total = documentRepository.countByOwnerId(ownerId);
-        long recent = documentRepository.count(ownerAndCreatedAfter(ownerId, recentThreshold));
-        long starred = documentStarRepository.countByUserId(ownerId);
-        long uploads = documentRepository.countByOwnerIdAndStatus(ownerId, Document.UploadStatus.COMPLETED);
+        // Total Documents
+        long total = entityManager.createQuery(
+                "SELECT COUNT(d) FROM Document d WHERE d.ownerId = :ownerId AND d.deleted = false", Long.class)
+                .setParameter("ownerId", ownerId)
+                .getSingleResult();
+
+        // Recent Documents
+        long recent = entityManager.createQuery(
+                "SELECT COUNT(d) FROM Document d WHERE d.ownerId = :ownerId AND d.createdAt >= :threshold AND d.deleted = false", Long.class)
+                .setParameter("ownerId", ownerId)
+                .setParameter("threshold", recentThreshold)
+                .getSingleResult();
+
+        // Starred Documents
+        long starred = entityManager.createQuery(
+                "SELECT COUNT(s) FROM DocumentStar s WHERE s.userId = :ownerId", Long.class)
+                .setParameter("ownerId", ownerId)
+                .getSingleResult();
+
+        // Completed Uploads
+        long uploads = entityManager.createQuery(
+                "SELECT COUNT(d) FROM Document d WHERE d.ownerId = :ownerId AND d.status = com.docusphere.backend.document.entity.Document.UploadStatus.COMPLETED AND d.deleted = false", Long.class)
+                .setParameter("ownerId", ownerId)
+                .getSingleResult();
 
         return new DashboardResponse(total, recent, starred, uploads);
-    }
-
-    private Specification<Document> ownerAndCreatedAfter(Long ownerId, LocalDateTime threshold) {
-        return (root, query, cb) -> cb.and(
-                cb.equal(root.get("ownerId"), ownerId),
-                cb.greaterThanOrEqualTo(root.get("createdAt"), threshold)
-        );
     }
 }
