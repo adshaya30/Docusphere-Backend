@@ -72,8 +72,9 @@ public class AuthController {
                     new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
             );
 
+            UserDetails principal = (UserDetails) authentication.getPrincipal();
             String jwt = jwtService.generateToken(
-                    (org.springframework.security.core.userdetails.User) authentication.getPrincipal(),
+                    principal,
                     user.getRole().getName(),
                     user.getId(),
                     request.isRememberMe());
@@ -91,6 +92,12 @@ public class AuthController {
             throw new BadCredentialsException("Invalid email or password. Please try again.");
         }
 
+    }
+
+    @PostMapping("/signOut")
+    public ResponseEntity<MessageResponse> signOut() {
+        // JWT auth is stateless: client signs out by removing token locally.
+        return ResponseEntity.ok(new MessageResponse("Signed out successfully.", 200));
     }
 
     @PostMapping("/forgot-password")

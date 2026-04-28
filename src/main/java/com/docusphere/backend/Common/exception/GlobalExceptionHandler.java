@@ -4,6 +4,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -55,6 +57,10 @@ public class GlobalExceptionHandler {
     // Handle Authentication Failures (wrong password, user not found, etc.)
     @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<Object> handleBadCredentials(BadCredentialsException ex) {
+        if (ex.getMessage() != null && ex.getMessage().contains("Email not verified")) {
+            return buildErrorResponse(HttpStatus.UNAUTHORIZED, "EMAIL_NOT_VERIFIED", ex.getMessage());
+        }
+
         return buildErrorResponse(HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS",
                 "Invalid email or password. Please try again.");
     }
@@ -64,6 +70,26 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Object> handleAuthenticationException(AuthenticationException ex) {
         return buildErrorResponse(HttpStatus.UNAUTHORIZED, "AUTHENTICATION_FAILED",
                 "Authentication failed. Please check your credentials.");
+    }
+
+    // Handle @Valid body validation failures
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<Object> handleMethodArgumentNotValid(MethodArgumentNotValidException ex) {
+        String message = ex.getBindingResult()
+                .getFieldErrors()
+                .stream()
+                .map(error -> error.getField() + ": " + error.getDefaultMessage())
+                .findFirst()
+                .orElse("Validation failed for request body.");
+
+        return buildErrorResponse(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", message);
+    }
+
+    // Handle missing query params like ?token= and ?email=
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<Object> handleMissingRequestParam(MissingServletRequestParameterException ex) {
+        String message = ex.getParameterName() + " parameter is required";
+        return buildErrorResponse(HttpStatus.BAD_REQUEST, "MISSING_REQUEST_PARAMETER", message);
     }
 
     // Handle any other unexpected exceptions
