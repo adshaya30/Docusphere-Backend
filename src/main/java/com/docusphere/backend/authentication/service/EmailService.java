@@ -1,13 +1,14 @@
 package com.docusphere.backend.authentication.service;
 
-import jakarta.mail.MessagingException;
-import jakarta.mail.internet.MimeMessage;
-import lombok.RequiredArgsConstructor;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
+
+import jakarta.mail.MessagingException;
+import jakarta.mail.internet.MimeMessage;
+import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
@@ -52,6 +53,27 @@ public class EmailService {
         context.setVariable("expiryTime", "30 minutes");   // You can change this
 
         String htmlContent = templateEngine.process("reset-password-email", context);
+
+        helper.setText(htmlContent, true);
+        mailSender.send(message);
+    }
+
+    // Send Team Invitation Email
+    public void sendTeamInvitationEmail(String to, String teamName, String inviterName) throws MessagingException {
+        MimeMessage message = mailSender.createMimeMessage();
+        MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+        helper.setTo(to);
+        helper.setSubject("You're invited to join team: " + teamName + " - DocuSphere");
+
+        String userName = to.split("@")[0];
+
+        Context context = new Context();
+        context.setVariable("userName", userName);
+        context.setVariable("teamName", teamName);
+        context.setVariable("inviterName", inviterName);
+
+        String htmlContent = templateEngine.process("team-invitation-email", context);
 
         helper.setText(htmlContent, true);
         mailSender.send(message);
