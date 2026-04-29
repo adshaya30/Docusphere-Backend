@@ -58,4 +58,19 @@ public class Team {
     protected void onUpdate() {
         this.updatedAt = LocalDateTime.now();
     }
+
+    public UUID getId() { return id; }
+    public void setId(UUID id) { this.id = id; }
+    public String getTeamName() { return teamName; }
+    public void setTeamName(String teamName) { this.teamName = teamName; }
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
+    public Integer getMemberCount() { return memberCount; }
+    public void setMemberCount(Integer memberCount) { this.memberCount = memberCount; }
+    public Integer getDocumentCount() { return documentCount; }
+    public void setDocumentCount(Integer documentCount) { this.documentCount = documentCount; }
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
 }
