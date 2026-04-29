@@ -12,6 +12,7 @@ import com.docusphere.backend.authentication.service.EmailService;
 import com.docusphere.backend.document.entity.Document;
 import com.docusphere.backend.document.repository.DocumentRepository;
 import com.docusphere.backend.document.storage.FileStorageService;
+import com.docusphere.backend.documentStar.repository.DocumentStarRepository;
 import com.docusphere.backend.team.dto.AddMemberRequest;
 import com.docusphere.backend.team.dto.TeamDto;
 import com.docusphere.backend.team.dto.TeamMemberDto;
@@ -45,6 +46,7 @@ public class UserTeamService {
     private final DocumentRepository documentRepository;
     private final FileStorageService fileStorageService;
     private final UserActivityRepository userActivityRepository;
+    private final DocumentStarRepository documentStarRepository;
 
     public UserTeamService(TeamRepository teamRepository,
                            TeamMemberRepository teamMemberRepository,
@@ -54,7 +56,8 @@ public class UserTeamService {
                            EmailService emailService,
                            DocumentRepository documentRepository,
                            FileStorageService fileStorageService,
-                           UserActivityRepository userActivityRepository) {
+                           UserActivityRepository userActivityRepository,
+                           DocumentStarRepository documentStarRepository) {
         this.teamRepository = teamRepository;
         this.teamMemberRepository = teamMemberRepository;
         this.teamInvitationRepository = teamInvitationRepository;
@@ -64,6 +67,7 @@ public class UserTeamService {
         this.documentRepository = documentRepository;
         this.fileStorageService = fileStorageService;
         this.userActivityRepository = userActivityRepository;
+        this.documentStarRepository = documentStarRepository;
     }
 
     /**
@@ -76,14 +80,6 @@ public class UserTeamService {
     public TeamDto createTeam(String name, String description, List<AddMemberRequest> initialMembers, Long leaderId) {
         User user = userRepository.findById(leaderId)
                 .orElseThrow(() -> new EntityNotFoundException("User not found: " + leaderId));
-
-        if (name == null || name.isBlank()) {
-            throw new com.docusphere.backend.Common.exception.InvalidRequestException("Team name is required");
-        }
-
-        if (teamRepository.existsByTeamName(name)) {
-            throw new com.docusphere.backend.Common.exception.InvalidRequestException("Team name already exists: " + name);
-        }
 
         Team team = new Team();
         team.setTeamName(name);
@@ -123,8 +119,9 @@ public class UserTeamService {
         }
 
         // 1. Cleanup document-related records
-        List<Document> teamDocuments = documentRepository.findByTeamIdAndDeletedFalse(teamId, org.springframework.data.domain.Pageable.unpaged()).getContent();
+        List<Document> teamDocuments = documentRepository.findAllByTeamId(teamId);
         for (Document document : teamDocuments) {
+        
             try {
                 fileStorageService.deleteFile(document.getStorageKey());
             } catch (Exception ignored) {
@@ -149,11 +146,11 @@ public class UserTeamService {
     @Transactional
     public TeamMemberDto addMember(UUID teamId, AddMemberRequest request, Long requesterId) {
         if (!teamService.isUserRoleInTeam(requesterId, teamId, TeamRole.LEADER)) {
-            throw new com.docusphere.backend.Common.exception.UnauthorizedAccessException("Only the LEADER can add members");
+            throw new IllegalStateException("Only the LEADER can add members");
         }
 
-        if (TeamRole.LEADER.name().equalsIgnoreCase(request.getRole())) {
-            throw new com.docusphere.backend.Common.exception.InvalidRequestException("Cannot add another LEADER to the team");
+        if (TeamRole.LEADER.name().equals(request.getRole())) {
+            throw new IllegalStateException("Cannot add another LEADER to the team");
         }
 
         Team team = teamRepository.findById(teamId)
@@ -171,36 +168,25 @@ public class UserTeamService {
                     .orElseThrow(() -> new EntityNotFoundException("User not found: " + request.getUserId()));
 
             if (teamMemberRepository.existsByUserIdAndTeamId(user.getId(), team.getId())) {
-                throw new com.docusphere.backend.Common.exception.InvalidRequestException("User is already in the team");
+                throw new IllegalStateException("User is already in the team");
             }
 
             TeamMember member = new TeamMember();
             member.setTeam(team);
             member.setUserId(user.getId());
             member.setFullName(user.getFullName());
-            TeamRole role;
-            try {
-                role = TeamRole.valueOf(request.getRole().toUpperCase());
-            } catch (Exception e) {
-                throw new com.docusphere.backend.Common.exception.InvalidRequestException("Invalid role: " + request.getRole());
-            }
-            member.setRole(role);
+            member.setRole(TeamRole.valueOf(request.getRole()));
             TeamMember saved = teamMemberRepository.save(member);
             teamRepository.incrementMemberCount(team.getId());
             return teamService.toMemberDto(saved);
         } else if (request.getEmail() != null) {
             String email = request.getEmail().toLowerCase();
-            TeamRole role;
-            try {
-                role = TeamRole.valueOf(request.getRole().toUpperCase());
-            } catch (Exception e) {
-                throw new com.docusphere.backend.Common.exception.InvalidRequestException("Invalid role: " + request.getRole());
-            }
+            TeamRole role = TeamRole.valueOf(request.getRole());
 
             return userRepository.findByEmail(email)
                     .map(user -> {
                         if (teamMemberRepository.existsByUserIdAndTeamId(user.getId(), team.getId())) {
-                            throw new com.docusphere.backend.Common.exception.InvalidRequestException("User is already in the team");
+                            throw new IllegalStateException("User is already in the team");
                         }
                         TeamMember member = new TeamMember();
                         member.setTeam(team);
@@ -264,14 +250,14 @@ public class UserTeamService {
     @Transactional
     public void removeMember(UUID teamId, Long memberUserId, Long requesterId) {
         if (!teamService.isUserRoleInTeam(requesterId, teamId, TeamRole.LEADER)) {
-            throw new com.docusphere.backend.Common.exception.UnauthorizedAccessException("Only the LEADER can remove members");
+            throw new IllegalStateException("Only the LEADER can remove members");
         }
 
         TeamMember membership = teamMemberRepository.findByUserIdAndTeamId(memberUserId, teamId)
                 .orElseThrow(() -> new EntityNotFoundException("Member not found in team"));
 
         if (membership.getRole() == TeamRole.LEADER) {
-            throw new com.docusphere.backend.Common.exception.InvalidRequestException("Cannot remove the LEADER. Transfer leadership first.");
+            throw new IllegalStateException("Cannot remove the LEADER. Transfer leadership first.");
         }
 
         teamMemberRepository.delete(membership);
@@ -281,24 +267,19 @@ public class UserTeamService {
     @Transactional
     public void updateMemberRole(UUID teamId, Long memberUserId, String newRole, Long requesterId) {
         if (!teamService.isUserRoleInTeam(requesterId, teamId, TeamRole.LEADER)) {
-            throw new com.docusphere.backend.Common.exception.UnauthorizedAccessException("Only the LEADER can update roles");
+            throw new IllegalStateException("Only the LEADER can update roles");
         }
 
         TeamMember membership = teamMemberRepository.findByUserIdAndTeamId(memberUserId, teamId)
                 .orElseThrow(() -> new EntityNotFoundException("Member not found in team"));
 
         if (membership.getRole() == TeamRole.LEADER) {
-            throw new com.docusphere.backend.Common.exception.InvalidRequestException("Cannot update the LEADER's role directly.");
+            throw new IllegalStateException("Cannot update the LEADER's role directly.");
         }
 
-        TeamRole role;
-        try {
-            role = TeamRole.valueOf(newRole.toUpperCase());
-        } catch (Exception e) {
-            throw new com.docusphere.backend.Common.exception.InvalidRequestException("Invalid role: " + newRole);
-        }
+        TeamRole role = TeamRole.valueOf(newRole);
         if (role == TeamRole.LEADER) {
-            throw new com.docusphere.backend.Common.exception.InvalidRequestException("Use transfer leader endpoint to change LEADER");
+            throw new IllegalStateException("Use transfer leader endpoint to change LEADER");
         }
 
         membership.setRole(role);

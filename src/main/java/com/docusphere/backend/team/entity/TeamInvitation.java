@@ -34,15 +34,4 @@ public class TeamInvitation {
     protected void onCreate() {
         this.invitedAt = LocalDateTime.now();
     }
-
-    public UUID getId() { return id; }
-    public void setId(UUID id) { this.id = id; }
-    public String getEmail() { return email; }
-    public void setEmail(String email) { this.email = email; }
-    public UUID getTeamId() { return teamId; }
-    public void setTeamId(UUID teamId) { this.teamId = teamId; }
-    public TeamRole getRole() { return role; }
-    public void setRole(TeamRole role) { this.role = role; }
-    public LocalDateTime getInvitedAt() { return invitedAt; }
-    public void setInvitedAt(LocalDateTime invitedAt) { this.invitedAt = invitedAt; }
 }

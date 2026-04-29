@@ -11,8 +11,6 @@ import com.docusphere.backend.team.entity.TeamInvitation;
 @Repository
 public interface TeamInvitationRepository extends JpaRepository<TeamInvitation, UUID> {
     List<TeamInvitation> findByEmail(String email);
-    List<TeamInvitation> findAllByTeamId(UUID teamId);
-    java.util.Optional<TeamInvitation> findByEmailAndTeamId(String email, UUID teamId);
     void deleteByEmailAndTeamId(String email, UUID teamId);
     void deleteByTeamId(UUID teamId);
 }

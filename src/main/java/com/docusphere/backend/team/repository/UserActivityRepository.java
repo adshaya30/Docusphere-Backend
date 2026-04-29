@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Repository
-public interface UserActivityRepository extends JpaRepository<UserActivity, UUID> {
+public interface UserActivityRepository extends JpaRepository<UserActivity, Long> {
     boolean existsByUserIdAndTeamIdAndOccurredAtAfter(Long userId, UUID teamId, LocalDateTime time);
     void deleteByTeamId(UUID teamId);
 }

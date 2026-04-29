@@ -38,6 +38,7 @@ public interface TeamMemberRepository extends JpaRepository<TeamMember, UUID> {
     void deleteByTeamId(UUID teamId);
 
     // Find the current leader of a team
+    // Find the current leader of a team
     @Query("SELECT tm FROM TeamMember tm WHERE tm.team.id = :teamId AND tm.role = com.docusphere.backend.team.entity.TeamRole.LEADER")
     Optional<TeamMember> findLeaderByTeamId(@Param("teamId") UUID teamId);
 

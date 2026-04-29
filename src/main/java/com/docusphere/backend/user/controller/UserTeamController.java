@@ -23,8 +23,7 @@ import com.docusphere.backend.team.dto.TeamDto;
 import com.docusphere.backend.team.dto.TeamMemberDto;
 import com.docusphere.backend.team.dto.UserStatusDto;
 import com.docusphere.backend.team.service.TeamService;
-import com.docusphere.backend.team.document.service.TeamDocumentService;
-import com.docusphere.backend.Common.response.ApiResponse;
+import com.docusphere.backend.user.services.UserDocumentService;
 import com.docusphere.backend.user.services.UserTeamService;
 
 @RestController
@@ -33,16 +32,16 @@ public class UserTeamController {
 
     private final UserTeamService userTeamService;
     private final TeamService teamService;
-    private final TeamDocumentService teamDocumentService;
+    private final UserDocumentService userDocumentService;
     private final JwtService jwtService;
 
     public UserTeamController(UserTeamService userTeamService,
                               TeamService teamService,
-                              TeamDocumentService teamDocumentService,
+                              UserDocumentService userDocumentService,
                               JwtService jwtService) {
         this.userTeamService = userTeamService;
         this.teamService = teamService;
-        this.teamDocumentService = teamDocumentService;
+        this.userDocumentService = userDocumentService;
         this.jwtService = jwtService;
     }
 
@@ -54,7 +53,7 @@ public class UserTeamController {
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<List<TeamDto>>> getMyTeams(@RequestHeader("Authorization") String token) {
+    public ResponseEntity<List<TeamDto>> getMyTeams(@RequestHeader("Authorization") String token) {
         Long userId = getUserId(token);
         
         // Auto-link pending invitations before returning teams
@@ -66,86 +65,86 @@ public class UserTeamController {
             .peek(team -> teamService.findMembership(userId, team.getId())
                 .ifPresent(m -> team.setCurrentUserRole(m.getRole() != null ? m.getRole().name() : null)))
                 .collect(Collectors.toList());
-        return ResponseEntity.ok(ApiResponse.success("Teams fetched successfully", myTeams));
+        return ResponseEntity.ok(myTeams);
     }
 
     @GetMapping("/{teamId}")
-    public ResponseEntity<ApiResponse<TeamDto>> getTeamById(@PathVariable UUID teamId, @RequestHeader("Authorization") String token) {
+    public ResponseEntity<TeamDto> getTeamById(@PathVariable UUID teamId, @RequestHeader("Authorization") String token) {
         Long userId = getUserId(token);
         if (!teamService.isUserInTeam(userId, teamId)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
         return teamService.findTeamById(teamId)
-                .map(team -> ResponseEntity.ok(ApiResponse.success("Team fetched successfully", teamService.toDto(team))))
+                .map(team -> ResponseEntity.ok(teamService.toDto(team)))
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @GetMapping("/{teamId}/members")
-    public ResponseEntity<ApiResponse<List<TeamMemberDto>>> getTeamMembers(@PathVariable UUID teamId, @RequestHeader("Authorization") String token) {
+    public ResponseEntity<List<TeamMemberDto>> getTeamMembers(@PathVariable UUID teamId, @RequestHeader("Authorization") String token) {
         Long userId = getUserId(token);
         if (!teamService.isUserInTeam(userId, teamId)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
-        return ResponseEntity.ok(ApiResponse.success("Members fetched successfully", teamService.getMembersOfTeam(teamId)));
+        return ResponseEntity.ok(teamService.getMembersOfTeam(teamId));
     }
 
     @GetMapping("/{teamId}/members/status")
-    public ResponseEntity<ApiResponse<List<UserStatusDto>>> getTeamMemberStatuses(@PathVariable UUID teamId, @RequestHeader("Authorization") String token) {
+    public ResponseEntity<List<UserStatusDto>> getTeamMemberStatuses(@PathVariable UUID teamId, @RequestHeader("Authorization") String token) {
         Long userId = getUserId(token);
         if (!teamService.isUserInTeam(userId, teamId)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
-        return ResponseEntity.ok(ApiResponse.success("Member statuses fetched successfully", teamService.getTeamMemberStatuses(teamId)));
+        return ResponseEntity.ok(teamService.getTeamMemberStatuses(teamId));
     }
 
     @GetMapping("/{teamId}/documents")
-    public ResponseEntity<ApiResponse<List<DocumentSummaryDto>>> getTeamDocuments(@PathVariable UUID teamId, @RequestHeader("Authorization") String token) {
+    public ResponseEntity<List<DocumentSummaryDto>> getTeamDocuments(@PathVariable UUID teamId, @RequestHeader("Authorization") String token) {
         Long userId = getUserId(token);
         if (!teamService.isUserInTeam(userId, teamId)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
-        return ResponseEntity.ok(ApiResponse.success("Documents fetched successfully", teamDocumentService.getTeamDocuments(userId, teamId)));
+        return ResponseEntity.ok(userDocumentService.getAccessibleDocuments(userId, teamId));
     }
 
     @PostMapping
-    public ResponseEntity<ApiResponse<TeamDto>> createTeam(@jakarta.validation.Valid @RequestBody TeamDto request, @RequestHeader("Authorization") String token) {
+    public ResponseEntity<TeamDto> createTeam(@RequestBody TeamDto request, @RequestHeader("Authorization") String token) {
         Long userId = getUserId(token);
         TeamDto created = userTeamService.createTeam(request.getName(), request.getDescription(), request.getMembers(), userId);
-        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Team created successfully", created));
+        return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
     @DeleteMapping("/{teamId}")
-    public ResponseEntity<ApiResponse<Void>> deleteTeam(@PathVariable UUID teamId, @RequestHeader("Authorization") String token) {
+    public ResponseEntity<Void> deleteTeam(@PathVariable UUID teamId, @RequestHeader("Authorization") String token) {
         Long userId = getUserId(token);
         userTeamService.deleteTeam(teamId, userId);
-        return ResponseEntity.ok(ApiResponse.success("Team deleted successfully", null));
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{teamId}/members")
-    public ResponseEntity<ApiResponse<TeamMemberDto>> addMember(@PathVariable UUID teamId, @jakarta.validation.Valid @RequestBody AddMemberRequest request, @RequestHeader("Authorization") String token) {
+    public ResponseEntity<TeamMemberDto> addMember(@PathVariable UUID teamId, @RequestBody AddMemberRequest request, @RequestHeader("Authorization") String token) {
         Long userId = getUserId(token);
         TeamMemberDto added = userTeamService.addMember(teamId, request, userId);
-        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Member added successfully", added));
+        return ResponseEntity.status(HttpStatus.CREATED).body(added);
     }
 
     @DeleteMapping("/{teamId}/members/{memberId}")
-    public ResponseEntity<ApiResponse<Void>> removeMember(@PathVariable UUID teamId, @PathVariable Long memberId, @RequestHeader("Authorization") String token) {
+    public ResponseEntity<Void> removeMember(@PathVariable UUID teamId, @PathVariable Long memberId, @RequestHeader("Authorization") String token) {
         Long userId = getUserId(token);
         userTeamService.removeMember(teamId, memberId, userId);
-        return ResponseEntity.ok(ApiResponse.success("Member removed successfully", null));
+        return ResponseEntity.noContent().build();
     }
 
     @PutMapping("/{teamId}/members/{memberId}/role")
-    public ResponseEntity<ApiResponse<Void>> updateMemberRole(@PathVariable UUID teamId, @PathVariable Long memberId, @jakarta.validation.Valid @RequestBody AddMemberRequest request, @RequestHeader("Authorization") String token) {
+    public ResponseEntity<Void> updateMemberRole(@PathVariable UUID teamId, @PathVariable Long memberId, @RequestBody AddMemberRequest request, @RequestHeader("Authorization") String token) {
         Long userId = getUserId(token);
         userTeamService.updateMemberRole(teamId, memberId, request.getRole(), userId);
-        return ResponseEntity.ok(ApiResponse.success("Member role updated successfully", null));
+        return ResponseEntity.ok().build();
     }
 
     @DeleteMapping("/{teamId}/documents/{documentId}")
-    public ResponseEntity<ApiResponse<Void>> deleteDocument(@PathVariable UUID teamId, @PathVariable UUID documentId, @RequestHeader("Authorization") String token) {
+    public ResponseEntity<Void> deleteDocument(@PathVariable UUID teamId, @PathVariable UUID documentId, @RequestHeader("Authorization") String token) {
         Long userId = getUserId(token);
-        teamDocumentService.deleteTeamDocument(documentId, userId, teamId);
-        return ResponseEntity.ok(ApiResponse.success("Document deleted successfully", null));
+        userDocumentService.deleteDocument(documentId, userId, teamId);
+        return ResponseEntity.noContent().build();
     }
 }

@@ -13,7 +13,8 @@ import java.util.UUID;
 public class UserActivity {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
+    @GeneratedValue
+    @Column(columnDefinition = "uuid")
     private UUID id;
 
     @Column(name = "user_id", nullable = false)

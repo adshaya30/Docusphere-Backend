@@ -1,10 +1,24 @@
 package com.docusphere.backend.team.entity;
 
-import jakarta.persistence.*;
-import lombok.*;
-
 import java.time.LocalDateTime;
 import java.util.UUID;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
+import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Entity
 @Table(name = "team_members")
@@ -53,7 +67,7 @@ public class TeamMember {
     @Column(name = "metadata", columnDefinition = "TEXT")
     private String metadata;
 
-    // Auto timestamps
+    //Auto timestamps
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();
@@ -76,29 +90,4 @@ public class TeamMember {
     protected void onUpdate() {
         this.updatedAt = LocalDateTime.now();
     }
-
-    public UUID getId() { return id; }
-    public void setId(UUID id) { this.id = id; }
-    public Team getTeam() { return team; }
-    public void setTeam(Team team) { this.team = team; }
-    public Long getUserId() { return userId; }
-    public void setUserId(Long userId) { this.userId = userId; }
-    public String getFullName() { return fullName; }
-    public void setFullName(String fullName) { this.fullName = fullName; }
-    public TeamRole getRole() { return role; }
-    public void setRole(TeamRole role) { this.role = role; }
-    public LocalDateTime getLastSeen() { return lastSeen; }
-    public void setLastSeen(LocalDateTime lastSeen) { this.lastSeen = lastSeen; }
-    public LocalDateTime getJoinedAt() { return joinedAt; }
-    public void setJoinedAt(LocalDateTime joinedAt) { this.joinedAt = joinedAt; }
-    public LocalDateTime getUpdatedAt() { return updatedAt; }
-    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
-    public LocalDateTime getCreatedAt() { return createdAt; }
-    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
-    public Boolean getActive() { return active; }
-    public void setActive(Boolean active) { this.active = active; }
-    public String getPermissions() { return permissions; }
-    public void setPermissions(String permissions) { this.permissions = permissions; }
-    public String getMetadata() { return metadata; }
-    public void setMetadata(String metadata) { this.metadata = metadata; }
 }
