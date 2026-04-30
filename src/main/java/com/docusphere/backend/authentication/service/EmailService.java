@@ -79,4 +79,24 @@ public class EmailService {
         mailSender.send(message);
     }
 
+    public void sendDocumentShareEmail(String to, String documentName, String ownerName, String shareUrl) {
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            helper.setTo(to);
+            helper.setSubject(ownerName + " shared a document with you - DocuSphere");
+
+            Context context = new Context();
+            context.setVariable("ownerName", ownerName);
+            context.setVariable("documentName", documentName);
+            context.setVariable("shareUrl", shareUrl);
+            String htmlContent = templateEngine.process("document-share-email", context);
+
+            helper.setText(htmlContent, true);
+            mailSender.send(message);
+        } catch (MessagingException ex) {
+            // Intentionally ignore email send failures; no logger required per request.
+        }
+    }
 }

@@ -51,7 +51,8 @@ public class MyDocumentsService {
                 .map(DocumentStar::getDocumentId)
                 .collect(Collectors.toSet());
 
-        Specification<Document> spec = MyDocumentsSpecifications.hasOwner(ownerId);
+        Specification<Document> spec = MyDocumentsSpecifications.hasOwner(ownerId)
+                .and(MyDocumentsSpecifications.isNotDeleted());
 
         if (teamId == null) {
             spec = spec.and(MyDocumentsSpecifications.isUserSpace());
