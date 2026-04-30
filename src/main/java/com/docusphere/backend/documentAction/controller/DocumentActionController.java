@@ -137,11 +137,20 @@ public class DocumentActionController {
     @GetMapping("/{id}/download")
     public ResponseEntity<Resource> download(
             @PathVariable("id") UUID documentId,
-            @RequestHeader("Authorization") String token
+            @RequestHeader(value = "Authorization", required = false) String token,
+            @RequestParam(value = "token", required = false) String shareToken
     ) {
-        Long requesterId = extractRequesterId(token);
-        Resource resource = service.download(requesterId, documentId);
-        String fileName = service.resolveDownloadFilename(requesterId, documentId);
+        Resource resource;
+        String fileName;
+
+        if (shareToken != null && !shareToken.isBlank()) {
+            resource = service.downloadByShareToken(documentId, shareToken);
+            fileName = service.resolveDownloadFilenameByShareToken(documentId, shareToken);
+        } else {
+            Long requesterId = extractRequesterId(token);
+            resource = service.download(requesterId, documentId);
+            fileName = service.resolveDownloadFilename(requesterId, documentId);
+        }
 
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)

@@ -13,6 +13,11 @@ public final class MyDocumentsSpecifications {
         return (root, query, cb) -> cb.equal(root.get("ownerId"), ownerId);
     }
 
+    public static Specification<Document> isNotDeleted() {
+        return (root, query, cb) -> cb.isFalse(root.get("deleted"));
+    }
+
+
     public static Specification<Document> hasTeamId(UUID teamId) {
         return (root, query, cb) -> cb.equal(root.get("teamId"), teamId);
     }

@@ -30,4 +30,12 @@ public interface DocumentRepository extends JpaRepository<Document, UUID>,
     Optional<Document> findByIdAndDeletedFalse(UUID id);
 
     List<Document> findByDeletedTrueAndDeletedAtBefore(LocalDateTime cutoff);
+
+    long countByOwnerId(Long ownerId);
+
+    long countByOwnerIdAndStatus(Long ownerId, Document.UploadStatus status);
+
+    Page<Document> findByOwnerIdAndTeamIdAndDeletedFalse(Long ownerId, UUID teamId, Pageable pageable);
+
+    List<Document> findAllByTeamId(UUID teamId);
 }
