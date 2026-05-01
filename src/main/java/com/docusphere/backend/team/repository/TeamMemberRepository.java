@@ -11,6 +11,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import org.springframework.data.jpa.repository.Modifying;
+
 import com.docusphere.backend.team.entity.TeamMember;
 import com.docusphere.backend.team.entity.TeamRole;
 
@@ -35,9 +37,10 @@ public interface TeamMemberRepository extends JpaRepository<TeamMember, UUID> {
     // Check if a user is in a team (any role)
     boolean existsByUserIdAndTeamId(Long userId, UUID teamId);
 
+    @Modifying
+
     void deleteByTeamId(UUID teamId);
 
-    // Find the current leader of a team
     // Find the current leader of a team
     @Query("SELECT tm FROM TeamMember tm WHERE tm.team.id = :teamId AND tm.role = com.docusphere.backend.team.entity.TeamRole.LEADER")
     Optional<TeamMember> findLeaderByTeamId(@Param("teamId") UUID teamId);

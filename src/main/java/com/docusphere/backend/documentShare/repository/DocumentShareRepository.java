@@ -4,7 +4,11 @@ import com.docusphere.backend.documentShare.entity.DocumentShare;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.time.LocalDateTime;
+// MODIFIED: Added List import for deleteByDocumentIdIn parameter
+import java.util.List;
 import java.util.Optional;
+// MODIFIED: Added @Modifying annotation import for batch delete operations
+import org.springframework.data.jpa.repository.Modifying;
 import java.util.UUID;
 
 public interface DocumentShareRepository extends JpaRepository<DocumentShare, UUID> {
@@ -20,4 +24,8 @@ public interface DocumentShareRepository extends JpaRepository<DocumentShare, UU
     default boolean isExpired(DocumentShare share, LocalDateTime now) {
         return share.getExpiresAt() != null && share.getExpiresAt().isBefore(now);
     }
+
+    // MODIFIED: Added batch delete method for admin merge team feature (deletes all shares for documents in list)
+    @Modifying
+    void deleteByDocumentIdIn(List<UUID> documentIds);
 }
