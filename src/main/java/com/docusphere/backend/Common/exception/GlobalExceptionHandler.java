@@ -113,6 +113,11 @@ public class GlobalExceptionHandler {
     }
 
     // RESOURCE 
+    // RESOURCE 
+    @ExceptionHandler(jakarta.persistence.EntityNotFoundException.class)
+    public ResponseEntity<Object> handleEntityNotFound(jakarta.persistence.EntityNotFoundException ex) {
+        return buildErrorResponse(HttpStatus.NOT_FOUND, "ENTITY_NOT_FOUND", ex.getMessage());
+    }
 
     @ExceptionHandler(NoResourceFoundException.class)
     public ResponseEntity<Object> handleNoResourceFound(NoResourceFoundException ex) {

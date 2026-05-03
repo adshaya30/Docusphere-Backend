@@ -2,14 +2,22 @@ package com.docusphere.backend.document.storage;
 
 import com.docusphere.backend.Common.exception.FileUploadException;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import java.io.File;
+
+/**
+ * Unified Supabase storage service.
+ * Consolidates upload, download, copy, and delete operations.
+ * Replaces duplicate SupabaseStorageService class.
+ */
 @Service
 public class SupabaseFileStorageService implements FileStorageService {
 
-    private final RestTemplate restTemplate = new RestTemplate();
+    private RestTemplate restTemplate = new RestTemplate();
 
     @Value("${supabase.url}")
     private String supabaseUrl;
@@ -19,6 +27,8 @@ public class SupabaseFileStorageService implements FileStorageService {
 
     @Value("${supabase.bucket.documents:documents}")
     private String bucketName;
+
+    // ──────────────────────────── File Operations ────────────────────────────────
 
     @Override
     public String copyFile(String sourcePath, String targetPath) {
@@ -65,6 +75,52 @@ public class SupabaseFileStorageService implements FileStorageService {
         return response.getBody();
     }
 
+    /**
+     * Upload file directly from File object.
+     * Used by DocumentUploadService for chunked uploads.
+     * Consolidates logic from old SupabaseStorageService.
+     */
+    public String uploadFile(File file, String storageKey) {
+        try {
+            String url = buildObjectUrl(storageKey);
+            HttpHeaders headers = buildAuthHeaders();
+            headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
+
+            FileSystemResource resource = new FileSystemResource(file);
+            HttpEntity<FileSystemResource> request = new HttpEntity<>(resource, headers);
+
+            ResponseEntity<String> response = restTemplate.exchange(
+                    url,
+                    HttpMethod.POST,
+                    request,
+                    String.class
+            );
+
+            if (!response.getStatusCode().is2xxSuccessful()) {
+                throw new FileUploadException(
+                        "Upload failed: " + response.getStatusCode() +
+                                " - " + response.getBody()
+                );
+            }
+
+            return getPublicUrl(storageKey);
+        } catch (FileUploadException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new FileUploadException("File upload failed: " + ex.getMessage(), ex);
+        }
+    }
+
+    /**
+     * Get public URL for a file in storage.
+     * Used to generate accessible links for downloaded files.
+     */
+    public String getPublicUrl(String storageKey) {
+        return supabaseUrl + "/storage/v1/object/public/" + bucketName + "/" + storageKey;
+    }
+
+    // ------------------------ Helpers -----------------------------------
+
     private void uploadBytes(byte[] content, String targetPath) {
         String url = buildObjectUrl(targetPath);
         HttpHeaders headers = buildAuthHeaders();
@@ -80,7 +136,7 @@ public class SupabaseFileStorageService implements FileStorageService {
         );
 
         if (!response.getStatusCode().is2xxSuccessful()) {
-            throw new FileUploadException("Failed to copy file to storage: " + targetPath);
+            throw new FileUploadException("Failed to upload file to storage: " + targetPath);
         }
     }
 

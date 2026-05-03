@@ -1,24 +1,33 @@
 package com.docusphere.backend.documentAction.service;
 
 import com.docusphere.backend.Common.exception.DocumentNotFoundException;
+import com.docusphere.backend.Common.exception.FileUploadException;
 import com.docusphere.backend.Common.exception.InvalidRequestException;
 import com.docusphere.backend.Common.exception.UnauthorizedAccessException;
 import com.docusphere.backend.document.entity.Document;
 import com.docusphere.backend.document.repository.DocumentRepository;
+import com.docusphere.backend.documentShare.service.DocumentSharingService;
 import com.docusphere.backend.document.storage.FileStorageService;
 import com.docusphere.backend.documentAction.dto.DocumentActionResponse;
 import com.docusphere.backend.documentAction.dto.TrashDocumentItemResponse;
 import com.docusphere.backend.documentAction.dto.TrashDocumentsPageResponse;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
+import org.springframework.http.ResponseEntity;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestTemplate;
 
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -28,8 +37,11 @@ public class DocumentActionServiceImpl implements DocumentActionService {
     private final DocumentRepository documentRepository;
     private final FileStorageService fileStorageService;
     private final TeamAccessValidator teamAccessValidator;
+    @Autowired(required = false)
+    private DocumentSharingService documentSharingService;
     private final String supabaseUrl;
     private final String bucketName;
+    private final RestTemplate restTemplate = new RestTemplate();
 
     public DocumentActionServiceImpl(
             DocumentRepository documentRepository,
@@ -84,7 +96,7 @@ public class DocumentActionServiceImpl implements DocumentActionService {
         Document original = requireActiveDocument(documentId);
         ensureAccessible(original, requesterId);
 
-        String duplicatedName = generateDuplicateName(original.getName(), original.getOwnerId(), original.getTeamId());
+        String duplicatedName = generateDuplicateName(original.getName(), requesterId, original.getTeamId());
         String duplicatedFileId = UUID.randomUUID().toString();
         String duplicatedStorageKey = fileStorageService.copyFile(
                 original.getStorageKey(),
@@ -96,7 +108,7 @@ public class DocumentActionServiceImpl implements DocumentActionService {
                 .name(duplicatedName)
                 .type(original.getType())
                 .sizeBytes(original.getSizeBytes())
-                .ownerId(original.getOwnerId())
+                .ownerId(requesterId)
                 .teamId(original.getTeamId())
                 .storageKey(duplicatedStorageKey)
                 .fileUrl(generateNewUrl(duplicatedStorageKey))
@@ -175,7 +187,7 @@ public class DocumentActionServiceImpl implements DocumentActionService {
     public Resource download(Long requesterId, UUID documentId) {
         Document document = requireActiveDocument(documentId);
         ensureAccessible(document, requesterId);
-        return new ByteArrayResource(fileStorageService.loadFile(document.getStorageKey()));
+        return new ByteArrayResource(loadDocumentBytes(document));
     }
 
     @Override
@@ -183,6 +195,26 @@ public class DocumentActionServiceImpl implements DocumentActionService {
     public String resolveDownloadFilename(Long requesterId, UUID documentId) {
         Document document = requireActiveDocument(documentId);
         ensureAccessible(document, requesterId);
+        return document.getName();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Resource downloadByShareToken(UUID documentId, String token) {
+        if (documentSharingService == null) {
+            throw new FileUploadException("Document sharing service is not available");
+        }
+        Document document = documentSharingService.checkReadAccessByShareToken(documentId, token);
+        return new ByteArrayResource(loadDocumentBytes(document));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public String resolveDownloadFilenameByShareToken(UUID documentId, String token) {
+        if (documentSharingService == null) {
+            throw new FileUploadException("Document sharing service is not available");
+        }
+        Document document = documentSharingService.checkReadAccessByShareToken(documentId, token);
         return document.getName();
     }
 
@@ -255,7 +287,97 @@ public class DocumentActionServiceImpl implements DocumentActionService {
         return supabaseUrl + "/storage/v1/object/public/" + bucketName + "/" + storageKey;
     }
 
-    private DocumentActionResponse toResponse(Document doc) {
+    private byte[] loadDocumentBytes(Document document) {
+        List<String> candidateStorageKeys = resolveStorageKeyCandidates(document);
+        Exception lastStorageException = null;
+
+        for (String candidateStorageKey : candidateStorageKeys) {
+            try {
+                return fileStorageService.loadFile(candidateStorageKey);
+            } catch (Exception ex) {
+                lastStorageException = ex;
+            }
+        }
+
+        try {
+            for (String candidateStorageKey : candidateStorageKeys) {
+                return loadFromPublicUrl(fileStorageService.getPublicUrl(candidateStorageKey));
+            }
+            return loadFromPublicUrl(document.getFileUrl());
+        } catch (Exception publicUrlException) {
+            throw new FileUploadException("Unable to download file from storage", lastStorageException != null
+                    ? lastStorageException
+                    : publicUrlException);
+        }
+    }
+
+    private List<String> resolveStorageKeyCandidates(Document document) {
+        Set<String> candidates = new LinkedHashSet<>();
+
+        String storageKey = normalize(document.getStorageKey());
+        if (storageKey != null) {
+            candidates.add(storageKey);
+        }
+
+        String keyFromUrl = extractStorageKeyFromFileUrl(document.getFileUrl());
+        if (keyFromUrl != null) {
+            candidates.add(keyFromUrl);
+        }
+
+        String fileId = document.getFileId();
+        String name = document.getName();
+        if (fileId == null || fileId.isBlank() || name == null || name.isBlank()) {
+            return new ArrayList<>(candidates);
+        }
+
+        String safeName = name.replaceAll("[^a-zA-Z0-9._-]", "_");
+        candidates.add("Documents/" + fileId + "_" + safeName);
+        candidates.add(fileId + "_" + safeName);
+
+        return new ArrayList<>(candidates);
+    }
+
+    private byte[] loadFromPublicUrl(String publicUrl) {
+        String normalizedUrl = normalize(publicUrl);
+        if (normalizedUrl == null) {
+            throw new FileUploadException("Unable to download file from storage");
+        }
+        try {
+            ResponseEntity<byte[]> response = restTemplate.getForEntity(normalizedUrl, byte[].class);
+            byte[] body = response.getBody();
+            if (!response.getStatusCode().is2xxSuccessful() || body == null) {
+                throw new FileUploadException("Unable to download file from public URL");
+            }
+            return body;
+        } catch (Exception publicUrlException) {
+            throw new FileUploadException("Unable to download file from storage", publicUrlException);
+        }
+    }
+
+    private String extractStorageKeyFromFileUrl(String fileUrl) {
+        String normalized = normalize(fileUrl);
+        if (normalized == null) {
+            return null;
+        }
+
+        String marker = "/storage/v1/object/public/" + bucketName + "/";
+        int markerIndex = normalized.indexOf(marker);
+        if (markerIndex < 0) {
+            return null;
+        }
+
+        String key = normalized.substring(markerIndex + marker.length());
+        return normalize(key);
+    }
+
+    private String normalize(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
+    }
+
+   private DocumentActionResponse toResponse(Document doc) {
         return DocumentActionResponse.builder()
                 .documentId(doc.getId())
                 .name(doc.getName())
@@ -284,4 +406,5 @@ public class DocumentActionServiceImpl implements DocumentActionService {
                 .updatedAt(doc.getUpdatedAt())
                 .build();
     }
+
 }

@@ -4,13 +4,15 @@ import com.docusphere.backend.Common.exception.FileUploadException;
 import com.docusphere.backend.Common.exception.InvalidRequestException;
 import com.docusphere.backend.document.entity.Document;
 import com.docusphere.backend.document.repository.DocumentRepository;
+import com.docusphere.backend.document.storage.FileStorageService;
+import com.docusphere.backend.documentAction.service.TeamAccessValidator;
+import com.docusphere.backend.Common.exception.UnauthorizedAccessException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.ByteArrayOutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -26,20 +28,20 @@ public class DocumentUploadService {
     private static final Logger LOGGER = LoggerFactory.getLogger(DocumentUploadService.class);
 
     private final DocumentRepository documentRepository;
-    private final SupabaseStorageService supabaseStorageService;
+    private final FileStorageService fileStorageService;
+    private final TeamAccessValidator teamAccessValidator;
 
     private final Path tempDir;
-    private final String bucketName;
 
     public DocumentUploadService(
             DocumentRepository repository,
-            SupabaseStorageService supabaseStorageService,
-            @Value("${supabase.bucket.documents:documents}") String bucketName,
+            FileStorageService fileStorageService,
+            TeamAccessValidator teamAccessValidator,
             @Value("${app.upload.dir:uploads}") String baseDir) throws Exception {
 
         this.documentRepository = repository;
-        this.supabaseStorageService = supabaseStorageService;
-        this.bucketName = bucketName;
+        this.fileStorageService = fileStorageService;
+        this.teamAccessValidator = teamAccessValidator;
 
         Path uploadDir = Paths.get(baseDir).toAbsolutePath().normalize();
         this.tempDir = uploadDir.resolve(TEMP_FOLDER);
@@ -178,16 +180,14 @@ public class DocumentUploadService {
                 throw new FileUploadException("Corrupted file");
             }
 
-            String fileUrl = supabaseStorageService.uploadFile(
-                    mergedFile,
-                    bucketName,
-                    storageKey);
+            // Use consolidated FileStorageService
+            String fileUrl = fileStorageService.uploadFile(mergedFile, storageKey);
 
             Document doc = Document.builder()
                     .fileId(fileId)
                     .name(safeName)
                     .type(getType(fileName))
-                    .sizeBytes((long) mergedFile.length())
+                    .sizeBytes(mergedFile.length())
                     .ownerId(ownerId)
                     .teamId(teamId)
                     .storageKey(storageKey)
@@ -245,10 +245,13 @@ public class DocumentUploadService {
     }
 
     private void validateTeamAccess(Long ownerId, UUID teamId) {
-        if (teamId == null)
-            return;
+        if (teamId == null) return;
 
-        // TEMP SAFE MODE (future team validation)
+        if (ownerId == null) throw new InvalidRequestException("Invalid user");
+
+        if (!teamAccessValidator.isMember(ownerId, teamId)) {
+            throw new UnauthorizedAccessException("User is not a member of the target team");
+        }
     }
 
     private String extractRootCauseMessage(Throwable throwable) {

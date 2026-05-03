@@ -73,7 +73,7 @@ public class DocumentUploadController {
         }
 
         Long ownerId = jwtService.extractUserId(token.substring(7));
-        UUID parsedTeamId = teamId != null && !teamId.isBlank() ? UUID.fromString(teamId.trim()) : null;
+        UUID parsedTeamId = parseOptionalTeamId(teamId);
 
         LOGGER.debug("Chunk upload: fileId={}, chunkIndex={}/{}",
                 fileId, chunkIndex, totalChunks);
@@ -90,5 +90,17 @@ public class DocumentUploadController {
                         new ChunkUploadResponse(result.isCompleted(), result.getDocumentId())
                 )
         );
+    }
+
+    private UUID parseOptionalTeamId(String teamId) {
+        if (teamId == null || teamId.isBlank()) {
+            return null;
+        }
+
+        try {
+            return UUID.fromString(teamId.trim());
+        } catch (IllegalArgumentException ex) {
+            throw new InvalidRequestException("teamId must be a valid UUID");
+        }
     }
 }
