@@ -40,7 +40,7 @@ if (Test-Path ".\venv\Scripts\python.exe") {
 # Run the Spring Boot backend
 Write-Host "Starting Spring Boot Backend..." -ForegroundColor Green
 if (Test-Path ".\mvnw.cmd") {
-    .\mvnw.cmd spring-boot:run
+    .\mvnw.cmd spring-boot:run -DskipTests
 } else {
-    mvn spring-boot:run
+    mvn spring-boot:run -DskipTests
 }

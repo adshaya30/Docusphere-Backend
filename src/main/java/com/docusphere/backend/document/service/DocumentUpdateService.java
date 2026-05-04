@@ -2,9 +2,8 @@ package com.docusphere.backend.document.service;
 
 import com.docusphere.backend.document.entity.Document;
 import com.docusphere.backend.document.repository.DocumentRepository;
-import com.docusphere.backend.upload.service.SupabaseStorageService;
+import com.docusphere.backend.document.storage.FileStorageService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -19,10 +18,7 @@ import java.util.UUID;
 public class DocumentUpdateService {
 
     private final DocumentRepository documentRepository;
-    private final SupabaseStorageService supabaseStorageService;
-
-    @Value("${supabase.bucket.documents}")
-    private String bucket;
+    private final FileStorageService fileStorageService;
 
     public Document saveEditedDocument(UUID documentId, MultipartFile file) throws IOException {
         Document existingDoc = documentRepository.findById(documentId)
@@ -32,14 +28,14 @@ public class DocumentUpdateService {
         String newFileName = UUID.randomUUID().toString() + "_" + file.getOriginalFilename();
         String newStorageKey = "versions/" + existingDoc.getId() + "/" + newFileName;
 
-        // Convert MultipartFile to File for SupabaseStorageService
+        // Convert MultipartFile to File for FileStorageService
         File tempFile = File.createTempFile("upload-", newFileName);
         try (FileOutputStream fos = new FileOutputStream(tempFile)) {
             fos.write(file.getBytes());
         }
 
-        // Upload to Supabase
-        String publicUrl = supabaseStorageService.uploadFile(tempFile, bucket, newStorageKey);
+        // Upload to Supabase using consolidated service
+        String publicUrl = fileStorageService.uploadFile(tempFile, newStorageKey);
         
         // Update document metadata with the NEW version info
         existingDoc.setStorageKey(newStorageKey);
