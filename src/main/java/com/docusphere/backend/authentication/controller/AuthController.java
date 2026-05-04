@@ -2,10 +2,7 @@ package com.docusphere.backend.authentication.controller;
 
 import com.docusphere.backend.Common.response.AuthResponse;
 import com.docusphere.backend.Common.response.MessageResponse;
-import com.docusphere.backend.authentication.dto.SignInRequest;
-import com.docusphere.backend.authentication.dto.SignUpRequest;
-import com.docusphere.backend.authentication.dto.ForgotPasswordRequest;
-import com.docusphere.backend.authentication.dto.ResetPasswordRequest;
+import com.docusphere.backend.authentication.dto.*;
 import com.docusphere.backend.authentication.entity.User;
 import com.docusphere.backend.authentication.service.JwtService;
 import com.docusphere.backend.authentication.service.UserService;
@@ -14,11 +11,13 @@ import com.docusphere.backend.Common.exception.UserNotFoundException;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
@@ -49,7 +48,8 @@ public class AuthController {
                 user.getRole().getName().replace("ROLE_", ""),
                 user.getFullName(),
                 user.getEmail(),
-                user.getId()
+                user.getId(),
+                user.getProfilePictureUrl()
         ));
     }
 
@@ -79,7 +79,14 @@ public class AuthController {
                     user.getId(),
                     request.isRememberMe());
 
-            return ResponseEntity.ok(new AuthResponse(jwt, user.getRole().getName().replace("ROLE_", ""), user.getFullName(), user.getEmail(), user.getId()));
+            return ResponseEntity.ok(new AuthResponse(
+                    jwt,
+                    user.getRole().getName().replace("ROLE_", ""),
+                    user.getFullName(),
+                    user.getEmail(),
+                    user.getId(),
+                    user.getProfilePictureUrl()
+            ));
         } catch (UserNotFoundException e) {
 
             throw new BadCredentialsException("Email not registered. Please sign up first.");
@@ -114,6 +121,22 @@ public class AuthController {
         } catch (Exception e) {
             throw e;
         }
+    }
+    @PutMapping("/change-password")
+    public ResponseEntity<MessageResponse> changePassword(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @Valid @RequestBody ChangePasswordRequest request) {
+
+        userService.changePassword(userDetails.getUsername(), request);
+        return ResponseEntity.ok(new MessageResponse("Password changed successfully", 200));
+    }
+    @PutMapping(value = "/profile", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<User> updateProfile(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @ModelAttribute UpdateProfileRequest request) throws Exception {
+
+        User updatedUser = userService.updateProfile(userDetails.getUsername(), request);
+        return ResponseEntity.ok(updatedUser);
     }
 
 }

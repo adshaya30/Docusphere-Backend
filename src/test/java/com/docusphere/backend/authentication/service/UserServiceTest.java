@@ -8,8 +8,10 @@ import com.docusphere.backend.Common.exception.InvalidPasswordException;
 import com.docusphere.backend.Common.exception.InvalidTokenException;
 import com.docusphere.backend.Common.exception.TokenExpiredException;
 import com.docusphere.backend.Common.exception.UserNotFoundException;
+import com.docusphere.backend.authentication.dto.ChangePasswordRequest;
 import com.docusphere.backend.authentication.dto.ResetPasswordRequest;
 import com.docusphere.backend.authentication.dto.SignUpRequest;
+import com.docusphere.backend.authentication.dto.UpdateProfileRequest;
 import com.docusphere.backend.authentication.entity.PasswordResetToken;
 import com.docusphere.backend.authentication.entity.Role;
 import com.docusphere.backend.authentication.entity.User;
@@ -26,6 +28,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.mock.web.MockMultipartFile;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -72,6 +75,9 @@ class UserServiceTest {
 
     @Mock
     private EmailService emailService;
+
+    @Mock
+    private SupabaseProfileStorageService supabaseProfileStorageService;
 
     @InjectMocks
     private UserService userService;
@@ -356,6 +362,131 @@ class UserServiceTest {
         verify(passwordResetTokenRepository, times(1)).delete(token);
     }
 
+    @Test
+    @DisplayName("changePassword fails when current password is incorrect")
+    void changePassword_whenCurrentPasswordIncorrect_shouldThrowInvalidPasswordException() {
+        User user = user("user@example.com", "old-encoded", true, role("ROLE_USER"));
+        ChangePasswordRequest request = changePasswordRequest("wrong-current", "Password@123", "Password@123");
+
+        when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("wrong-current", "old-encoded")).thenReturn(false);
+
+        assertThrows(InvalidPasswordException.class, () -> userService.changePassword("USER@example.com", request));
+
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("changePassword fails when new passwords do not match")
+    void changePassword_whenNewPasswordsDoNotMatch_shouldThrowInvalidPasswordException() {
+        User user = user("user@example.com", "old-encoded", true, role("ROLE_USER"));
+        ChangePasswordRequest request = changePasswordRequest("old-password", "Password@123", "Different@123");
+
+        when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("old-password", "old-encoded")).thenReturn(true);
+
+        assertThrows(InvalidPasswordException.class, () -> userService.changePassword("USER@example.com", request));
+
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("changePassword fails when new password is same as current password")
+    void changePassword_whenNewPasswordSameAsCurrent_shouldThrowInvalidPasswordException() {
+        User user = user("user@example.com", "old-encoded", true, role("ROLE_USER"));
+        ChangePasswordRequest request = changePasswordRequest("old-password", "Password@123", "Password@123");
+
+        when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("old-password", "old-encoded")).thenReturn(true);
+        when(passwordEncoder.matches("Password@123", "old-encoded")).thenReturn(true);
+
+        assertThrows(InvalidPasswordException.class, () -> userService.changePassword("USER@example.com", request));
+
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("changePassword succeeds and saves encoded password")
+    void changePassword_whenValid_shouldSaveEncodedPassword() {
+        User user = user("user@example.com", "old-encoded", true, role("ROLE_USER"));
+        ChangePasswordRequest request = changePasswordRequest("old-password", "Password@123", "Password@123");
+
+        when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("old-password", "old-encoded")).thenReturn(true);
+        when(passwordEncoder.matches("Password@123", "old-encoded")).thenReturn(false);
+        when(passwordEncoder.encode("Password@123")).thenReturn("new-encoded");
+
+        userService.changePassword("USER@example.com", request);
+
+        assertEquals("new-encoded", user.getPassword());
+        verify(userRepository, times(1)).save(user);
+    }
+
+    @Test
+    @DisplayName("updateProfile updates only the full name and saves user")
+    void updateProfile_whenFullNameChanged_shouldSaveUser() throws Exception {
+        User user = user("user@example.com", "old-encoded", true, role("ROLE_USER"));
+        user.setId(10L);
+        user.setFullName("Old Name");
+
+        UpdateProfileRequest request = new UpdateProfileRequest();
+        request.setFullName("  New Name  ");
+
+        when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(user));
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        User result = userService.updateProfile("USER@example.com", request);
+
+        assertEquals("New Name", result.getFullName());
+        verify(supabaseProfileStorageService, never()).deleteProfilePicture(any());
+        verify(supabaseProfileStorageService, never()).uploadProfilePicture(any(), any());
+        verify(userRepository, times(1)).save(user);
+    }
+
+    @Test
+    @DisplayName("updateProfile removes profile picture when requested")
+    void updateProfile_whenRemoveProfilePicture_shouldDeleteAndClearUrl() throws Exception {
+        User user = user("user@example.com", "old-encoded", true, role("ROLE_USER"));
+        user.setId(10L);
+        user.setProfilePictureUrl("https://supabase.co/storage/v1/object/public/profile-pictures/old.jpg");
+
+        UpdateProfileRequest request = new UpdateProfileRequest();
+        request.setRemoveProfilePicture(true);
+
+        when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(user));
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        User result = userService.updateProfile("USER@example.com", request);
+
+        assertEquals(null, result.getProfilePictureUrl());
+        verify(supabaseProfileStorageService, times(1)).deleteProfilePicture("https://supabase.co/storage/v1/object/public/profile-pictures/old.jpg");
+        verify(supabaseProfileStorageService, never()).uploadProfilePicture(any(), any());
+        verify(userRepository, times(1)).save(user);
+    }
+
+    @Test
+    @DisplayName("updateProfile uploads new profile picture and replaces old one")
+    void updateProfile_whenUploadNewPicture_shouldDeleteOldAndUploadNew() throws Exception {
+        User user = user("user@example.com", "old-encoded", true, role("ROLE_USER"));
+        user.setId(10L);
+        user.setProfilePictureUrl("https://supabase.co/storage/v1/object/public/profile-pictures/old.jpg");
+
+        UpdateProfileRequest request = new UpdateProfileRequest();
+        request.setProfilePicture(new MockMultipartFile("profilePicture", "avatar.jpg", "image/jpeg", "image-bytes".getBytes()));
+
+        when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(user));
+        when(supabaseProfileStorageService.uploadProfilePicture(any(), eq(10L)))
+                .thenReturn("https://supabase.co/storage/v1/object/public/profile-pictures/new.jpg");
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        User result = userService.updateProfile("USER@example.com", request);
+
+        assertEquals("https://supabase.co/storage/v1/object/public/profile-pictures/new.jpg", result.getProfilePictureUrl());
+        verify(supabaseProfileStorageService, times(1)).deleteProfilePicture("https://supabase.co/storage/v1/object/public/profile-pictures/old.jpg");
+        verify(supabaseProfileStorageService, times(1)).uploadProfilePicture(any(), eq(10L));
+        verify(userRepository, times(1)).save(user);
+    }
+
     private SignUpRequest signUpRequest(String fullName, String email, String password, String confirmPassword) {
         SignUpRequest request = new SignUpRequest();
         request.setFullName(fullName);
@@ -370,6 +501,14 @@ class UserServiceTest {
         role.setId(1L);
         role.setName(name);
         return role;
+    }
+
+    private ChangePasswordRequest changePasswordRequest(String currentPassword, String newPassword, String confirmNewPassword) {
+        ChangePasswordRequest request = new ChangePasswordRequest();
+        request.setCurrentPassword(currentPassword);
+        request.setNewPassword(newPassword);
+        request.setConfirmNewPassword(confirmNewPassword);
+        return request;
     }
 
     private User user(String email, String password, boolean enabled, Role role) {

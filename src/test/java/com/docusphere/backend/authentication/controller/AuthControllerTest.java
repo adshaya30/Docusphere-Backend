@@ -30,12 +30,14 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 
 @WebMvcTest(AuthController.class)
-@AutoConfigureMockMvc(addFilters = false)
+@AutoConfigureMockMvc
 class AuthControllerTest {
 
     @Autowired
@@ -487,6 +489,115 @@ class AuthControllerTest {
         verify(userService, never()).resetPassword(any());
     }
 
+    // ===================== CHANGE PASSWORD TESTS =====================
+
+    @Test
+    @DisplayName("PUT /api/auth/change-password - Success with valid request and correct current password")
+    void changePassword_withValidRequest_shouldReturnSuccess() throws Exception {
+        ChangePasswordRequest request = createChangePasswordRequest("OldPassword@123", "NewPassword@456", "NewPassword@456");
+        UserDetails userDetails = createUserDetails("user@example.com");
+
+        mockMvc.perform(put("/api/auth/change-password")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request))
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(userDetails))
+                .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Password changed successfully"))
+                .andExpect(jsonPath("$.statusCode").value(200))
+                .andDo(print());
+
+        verify(userService).changePassword(eq("user@example.com"), any(ChangePasswordRequest.class));
+    }
+
+    @Test
+    @DisplayName("PUT /api/auth/change-password - Fail when current password is incorrect")
+    void changePassword_whenCurrentPasswordIncorrect_shouldReturnBadRequest() throws Exception {
+        ChangePasswordRequest request = createChangePasswordRequest("WrongPassword@123", "NewPassword@456", "NewPassword@456");
+        UserDetails userDetails = createUserDetails("user@example.com");
+
+        doThrow(new InvalidPasswordException("Current password is incorrect"))
+                .when(userService).changePassword(anyString(), any(ChangePasswordRequest.class));
+
+        mockMvc.perform(put("/api/auth/change-password")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request))
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(userDetails))
+                .with(csrf()))
+                .andExpect(status().is4xxClientError())
+                .andDo(print());
+    }
+
+    @Test
+    @DisplayName("PUT /api/auth/change-password - Fail when new passwords do not match")
+    void changePassword_whenNewPasswordsDoNotMatch_shouldReturnBadRequest() throws Exception {
+        ChangePasswordRequest request = createChangePasswordRequest("OldPassword@123", "NewPassword@456", "Different@789");
+        UserDetails userDetails = createUserDetails("user@example.com");
+
+        doThrow(new InvalidPasswordException("New passwords do not match"))
+                .when(userService).changePassword(anyString(), any(ChangePasswordRequest.class));
+
+        mockMvc.perform(put("/api/auth/change-password")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request))
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(userDetails))
+                .with(csrf()))
+                .andExpect(status().is4xxClientError())
+                .andDo(print());
+    }
+
+    @Test
+    @DisplayName("PUT /api/auth/change-password - Fail when new password same as current password")
+    void changePassword_whenNewPasswordSameAsCurrent_shouldReturnBadRequest() throws Exception {
+        ChangePasswordRequest request = createChangePasswordRequest("OldPassword@123", "OldPassword@123", "OldPassword@123");
+        UserDetails userDetails = createUserDetails("user@example.com");
+
+        doThrow(new InvalidPasswordException("New password must be different from your current password"))
+                .when(userService).changePassword(anyString(), any(ChangePasswordRequest.class));
+
+        mockMvc.perform(put("/api/auth/change-password")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request))
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(userDetails))
+                .with(csrf()))
+                .andExpect(status().is4xxClientError())
+                .andDo(print());
+    }
+
+    @Test
+    @DisplayName("PUT /api/auth/change-password - Fail when user not found")
+    void changePassword_whenUserNotFound_shouldReturnNotFound() throws Exception {
+        ChangePasswordRequest request = createChangePasswordRequest("OldPassword@123", "NewPassword@456", "NewPassword@456");
+        UserDetails userDetails = createUserDetails("user@example.com");
+
+        doThrow(new UserNotFoundException("User not found"))
+                .when(userService).changePassword(anyString(), any(ChangePasswordRequest.class));
+
+        mockMvc.perform(put("/api/auth/change-password")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request))
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(userDetails))
+                .with(csrf()))
+                .andExpect(status().is4xxClientError())
+                .andDo(print());
+    }
+
+    @Test
+    @DisplayName("PUT /api/auth/change-password - Fail when validation fails")
+    void changePassword_withMissingFields_shouldReturnBadRequest() throws Exception {
+        UserDetails userDetails = createUserDetails("user@example.com");
+
+        mockMvc.perform(put("/api/auth/change-password")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}")
+                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(userDetails))
+                .with(csrf()))
+                .andExpect(status().isBadRequest())
+                .andDo(print());
+
+        verify(userService, never()).changePassword(anyString(), any());
+    }
+
     // ===================== HELPER METHODS =====================
 
     private SignUpRequest createSignUpRequest(String fullName, String email, String password, String confirmPassword) {
@@ -514,6 +625,14 @@ class AuthControllerTest {
         return request;
     }
 
+    private ChangePasswordRequest createChangePasswordRequest(String currentPassword, String newPassword, String confirmNewPassword) {
+        ChangePasswordRequest request = new ChangePasswordRequest();
+        request.setCurrentPassword(currentPassword);
+        request.setNewPassword(newPassword);
+        request.setConfirmNewPassword(confirmNewPassword);
+        return request;
+    }
+
     private User createUser(Long id, String email, String fullName, boolean enabled, String roleName) {
         User user = new User();
         user.setId(id);
@@ -527,5 +646,39 @@ class AuthControllerTest {
         user.setRole(role);
         return user;
     }
-}
 
+    // ===================== USER DETAILS HELPER METHODS =====================
+
+    /**
+     * Creates UserDetails for a regular USER
+     */
+    private UserDetails createUserDetails(String email) {
+        return org.springframework.security.core.userdetails.User.builder()
+                .username(email)
+                .password("password")
+                .authorities("ROLE_USER")
+                .build();
+    }
+
+    /**
+     * Creates UserDetails for an ADMIN (with both ROLE_ADMIN and ROLE_USER)
+     */
+    private UserDetails createAdminDetails(String email) {
+        return org.springframework.security.core.userdetails.User.builder()
+                .username(email)
+                .password("password")
+                .authorities("ROLE_ADMIN", "ROLE_USER")
+                .build();
+    }
+
+    /**
+     * Creates UserDetails with custom authorities
+     */
+    private UserDetails createUserDetailsWithAuthorities(String email, String... authorities) {
+        return org.springframework.security.core.userdetails.User.builder()
+                .username(email)
+                .password("password")
+                .authorities(authorities)
+                .build();
+    }
+}

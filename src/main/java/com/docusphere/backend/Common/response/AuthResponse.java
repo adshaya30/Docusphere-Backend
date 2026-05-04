@@ -9,4 +9,5 @@ public class AuthResponse {
     private String fullName;
     private String email;
     private Long userId;
+    private String profilePictureUrl;
 }
