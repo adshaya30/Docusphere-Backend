@@ -8,8 +8,10 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
@@ -18,43 +20,42 @@ import java.util.Map;
 @Slf4j
 public class GlobalExceptionHandler {
 
-    // Handle Duplicate Email
+    // AUTH & USER 
+
     @ExceptionHandler(EmailAlreadyExistsException.class)
     public ResponseEntity<Object> handleEmailAlreadyExists(EmailAlreadyExistsException ex) {
         return buildErrorResponse(HttpStatus.CONFLICT, "EMAIL_ALREADY_EXISTS", ex.getMessage());
     }
 
-    // Handle Password Mismatch
     @ExceptionHandler(InvalidPasswordException.class)
     public ResponseEntity<Object> handleInvalidPassword(InvalidPasswordException ex) {
         return buildErrorResponse(HttpStatus.BAD_REQUEST, "INVALID_PASSWORD", ex.getMessage());
     }
 
-    // Handle User Not Found
     @ExceptionHandler(UserNotFoundException.class)
     public ResponseEntity<Object> handleUserNotFound(UserNotFoundException ex) {
         return buildErrorResponse(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", ex.getMessage());
     }
 
-    // Handle Invalid Token
-    @ExceptionHandler(InvalidTokenException.class)
-    public ResponseEntity<Object> handleInvalidToken(InvalidTokenException ex) {
-        return buildErrorResponse(HttpStatus.BAD_REQUEST, "INVALID_TOKEN", ex.getMessage());
-    }
-
-    // Handle Token Expired
-    @ExceptionHandler(TokenExpiredException.class)
-    public ResponseEntity<Object> handleTokenExpired(TokenExpiredException ex) {
-        return buildErrorResponse(HttpStatus.BAD_REQUEST, "TOKEN_EXPIRED", ex.getMessage());
-    }
-
-    // Handle Email Not Verified
     @ExceptionHandler(EmailNotVerifiedException.class)
     public ResponseEntity<Object> handleEmailNotVerified(EmailNotVerifiedException ex) {
         return buildErrorResponse(HttpStatus.BAD_REQUEST, "EMAIL_NOT_VERIFIED", ex.getMessage());
     }
 
-    // Handle Authentication Failures (wrong password, user not found, etc.)
+    //TOKEN
+
+    @ExceptionHandler(InvalidTokenException.class)
+    public ResponseEntity<Object> handleInvalidToken(InvalidTokenException ex) {
+        return buildErrorResponse(HttpStatus.BAD_REQUEST, "INVALID_TOKEN", ex.getMessage());
+    }
+
+    @ExceptionHandler(TokenExpiredException.class)
+    public ResponseEntity<Object> handleTokenExpired(TokenExpiredException ex) {
+        return buildErrorResponse(HttpStatus.BAD_REQUEST, "TOKEN_EXPIRED", ex.getMessage());
+    }
+
+    // AUTHENTICATION 
+
     @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<Object> handleBadCredentials(BadCredentialsException ex) {
         if (ex.getMessage() != null && ex.getMessage().contains("Email not verified")) {
@@ -65,7 +66,6 @@ public class GlobalExceptionHandler {
                 "Invalid email or password. Please try again.");
     }
 
-    // Handle other authentication exceptions
     @ExceptionHandler(AuthenticationException.class)
     public ResponseEntity<Object> handleAuthenticationException(AuthenticationException ex) {
         return buildErrorResponse(HttpStatus.UNAUTHORIZED, "AUTHENTICATION_FAILED",
@@ -99,7 +99,42 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_SERVER_ERROR",
                 "An unexpected error occurred. Please try again later.");
     }
-    // Handle No Resource Found
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<Object> handleValidationErrors(MethodArgumentNotValidException ex) {
+        String message = ex.getBindingResult().getFieldErrors().stream()
+                .findFirst()
+                .map(error -> error.getField() + ": " + error.getDefaultMessage())
+                .orElse("Validation failed");
+
+        return buildErrorResponse(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", message);
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<Object> handleIllegalArgument(IllegalArgumentException ex) {
+        return buildErrorResponse(HttpStatus.BAD_REQUEST, "INVALID_ARGUMENT", ex.getMessage());
+    }
+
+    // ACCESS 
+
+    @ExceptionHandler(UnauthorizedAccessException.class)
+    public ResponseEntity<Object> handleUnauthorizedAccess(UnauthorizedAccessException ex) {
+        return buildErrorResponse(HttpStatus.FORBIDDEN, "UNAUTHORIZED_ACCESS", ex.getMessage());
+    }
+
+    // ADMIN
+    @ExceptionHandler(AdminDashboardException.class)
+    public ResponseEntity<Object> handleAdminDashboardException(AdminDashboardException ex) {
+        return buildErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR, "ADMIN_DASHBOARD_ERROR", ex.getMessage());
+    }
+
+    // RESOURCE 
+    // RESOURCE 
+    @ExceptionHandler(jakarta.persistence.EntityNotFoundException.class)
+    public ResponseEntity<Object> handleEntityNotFound(jakarta.persistence.EntityNotFoundException ex) {
+        return buildErrorResponse(HttpStatus.NOT_FOUND, "ENTITY_NOT_FOUND", ex.getMessage());
+    }
+
     @ExceptionHandler(NoResourceFoundException.class)
     public ResponseEntity<Object> handleNoResourceFound(NoResourceFoundException ex) {
         return buildErrorResponse(
@@ -109,8 +144,19 @@ public class GlobalExceptionHandler {
         );
     }
 
-    // Helper method to build consistent error response
+    //GLOBAL
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<Object> handleGlobalException(Exception ex) {
+        log.error("Unexpected error occurred:", ex);
+        return buildErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_SERVER_ERROR",
+                "An unexpected error occurred. Please try again later.");
+    }
+
+    //  COMMON RESPONSE 
+
     private ResponseEntity<Object> buildErrorResponse(HttpStatus status, String errorCode, String message) {
+
         Map<String, Object> errorResponse = new HashMap<>();
         errorResponse.put("timestamp", LocalDateTime.now());
         errorResponse.put("status", status.value());
