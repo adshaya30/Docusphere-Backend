@@ -10,12 +10,15 @@ import com.docusphere.backend.authentication.service.security.CustomUserDetailsS
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.AfterEach;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
+import org.springframework.http.HttpHeaders;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -23,6 +26,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.security.test.context.support.WithMockUser;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.ArgumentMatchers.any;
@@ -37,7 +41,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 
 @WebMvcTest(AuthController.class)
-@AutoConfigureMockMvc
+@AutoConfigureMockMvc(addFilters = false)
 class AuthControllerTest {
 
     @Autowired
@@ -57,6 +61,11 @@ class AuthControllerTest {
 
     @Autowired
     private CustomUserDetailsService userDetailsService;
+
+    @AfterEach
+    void resetMocks() {
+        reset(userService, jwtService, authenticationManager, userDetailsService);
+    }
 
     @TestConfiguration
     static class TestConfig {
@@ -94,7 +103,8 @@ class AuthControllerTest {
 
         mockMvc.perform(post("/api/auth/signUp")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+                .content(objectMapper.writeValueAsString(request))
+                .with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value("Please check your email to verify your account."))
                 .andExpect(jsonPath("$.statusCode").value(200))
@@ -113,7 +123,8 @@ class AuthControllerTest {
 
         mockMvc.perform(post("/api/auth/signUp")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+                .content(objectMapper.writeValueAsString(request))
+                .with(csrf()))
                 .andExpect(status().is4xxClientError())
                 .andDo(print());
     }
@@ -128,7 +139,8 @@ class AuthControllerTest {
 
         mockMvc.perform(post("/api/auth/signUp")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+                .content(objectMapper.writeValueAsString(request))
+                .with(csrf()))
                 .andExpect(status().is4xxClientError())
                 .andDo(print());
     }
@@ -138,7 +150,8 @@ class AuthControllerTest {
     void signUp_withMissingFields_shouldReturnBadRequest() throws Exception {
         mockMvc.perform(post("/api/auth/signUp")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{}"))
+                .content("{}")
+                .with(csrf()))
                 .andExpect(status().isBadRequest())
                 .andDo(print());
 
@@ -158,17 +171,28 @@ class AuthControllerTest {
 
         when(userService.findByEmail("john@example.com")).thenReturn(user);
         when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class))).thenReturn(authentication);
-        when(jwtService.generateToken(userDetails, "ROLE_USER", 1L, false)).thenReturn("jwt-token-value");
+        when(jwtService.generateAccessToken(userDetails, "ROLE_USER", 1L)).thenReturn("access-token-value");
+        when(jwtService.generateRefreshToken(any(UserDetails.class), eq(1L), anyBoolean())).thenReturn("refresh-token-value");
 
         mockMvc.perform(post("/api/auth/signIn")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+                .content(objectMapper.writeValueAsString(request))
+                .with(csrf()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.token").value("jwt-token-value"))
+                .andExpect(jsonPath("$.accessToken").value("access-token-value"))
+                .andExpect(jsonPath("$.refreshToken").value("refresh-token-value"))
                 .andExpect(jsonPath("$.role").value("USER"))
                 .andExpect(jsonPath("$.fullName").value("John Doe"))
                 .andExpect(jsonPath("$.email").value("john@example.com"))
                 .andExpect(jsonPath("$.userId").value(1))
+                .andExpect(result -> {
+                    var cookies = result.getResponse().getHeaders(HttpHeaders.SET_COOKIE);
+                    assertTrue(cookies.stream().anyMatch(value -> value.contains("accessToken=access-token-value")));
+                    assertTrue(cookies.stream().anyMatch(value -> value.startsWith("refreshToken=") && !value.contains("Max-Age")));
+                    assertTrue(cookies.stream().anyMatch(value -> value.contains("HttpOnly")));
+                    assertTrue(cookies.stream().anyMatch(value -> value.contains("Secure")));
+                    assertTrue(cookies.stream().anyMatch(value -> value.contains("SameSite=None")));
+                })
                 .andDo(print());
 
         verify(userService).findByEmail("john@example.com");
@@ -185,7 +209,8 @@ class AuthControllerTest {
 
         mockMvc.perform(post("/api/auth/signIn")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+                .content(objectMapper.writeValueAsString(request))
+                .with(csrf()))
                 .andExpect(status().isUnauthorized())
                 .andDo(print());
     }
@@ -200,7 +225,8 @@ class AuthControllerTest {
 
         mockMvc.perform(post("/api/auth/signIn")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+                .content(objectMapper.writeValueAsString(request))
+                .with(csrf()))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.message").value(containsString("Email not verified")))
                 .andDo(print());
@@ -218,7 +244,8 @@ class AuthControllerTest {
 
         mockMvc.perform(post("/api/auth/signIn")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+                .content(objectMapper.writeValueAsString(request))
+                .with(csrf()))
                 .andExpect(status().isUnauthorized())
                 .andDo(print());
     }
@@ -234,16 +261,24 @@ class AuthControllerTest {
 
         when(userService.findByEmail("john@example.com")).thenReturn(user);
         when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class))).thenReturn(authentication);
-        when(jwtService.generateToken(userDetails, "ROLE_USER", 1L, true)).thenReturn("jwt-token-long-expiry");
+        when(jwtService.generateAccessToken(userDetails, "ROLE_USER", 1L)).thenReturn("access-token-long-expiry");
+        when(jwtService.generateRefreshToken(any(UserDetails.class), eq(1L), anyBoolean())).thenReturn("refresh-token-long-expiry");
 
         mockMvc.perform(post("/api/auth/signIn")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+                .content(objectMapper.writeValueAsString(request))
+                .with(csrf()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.token").value("jwt-token-long-expiry"))
+                .andExpect(jsonPath("$.accessToken").value("access-token-long-expiry"))
+                .andExpect(jsonPath("$.refreshToken").value("refresh-token-long-expiry"))
+                .andExpect(result -> {
+                    var cookies = result.getResponse().getHeaders(HttpHeaders.SET_COOKIE);
+                    assertTrue(cookies.stream().anyMatch(value -> value.startsWith("refreshToken=") && value.contains("Max-Age=604800")));
+                })
                 .andDo(print());
 
-        verify(jwtService).generateToken(userDetails, "ROLE_USER", 1L, true);
+        verify(jwtService).generateAccessToken(userDetails, "ROLE_USER", 1L);
+        verify(jwtService).generateRefreshToken(any(UserDetails.class), eq(1L), eq(true));
     }
 
     // ===================== SIGN OUT TESTS =====================
@@ -251,11 +286,108 @@ class AuthControllerTest {
     @Test
     @DisplayName("POST /api/auth/signOut - Success")
     void signOut_shouldReturnSuccessMessage() throws Exception {
-        mockMvc.perform(post("/api/auth/signOut"))
+        mockMvc.perform(post("/api/auth/signOut")
+                .with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value("Signed out successfully."))
                 .andExpect(jsonPath("$.statusCode").value(200))
+                .andExpect(result -> {
+                    var cookies = result.getResponse().getHeaders(HttpHeaders.SET_COOKIE);
+                    assertTrue(cookies.stream().anyMatch(value -> value.startsWith("accessToken=") && value.contains("Max-Age=0")));
+                    assertTrue(cookies.stream().anyMatch(value -> value.startsWith("refreshToken=") && value.contains("Max-Age=0")));
+                    assertTrue(cookies.stream().anyMatch(value -> value.contains("HttpOnly")));
+                    assertTrue(cookies.stream().anyMatch(value -> value.contains("Secure")));
+                    assertTrue(cookies.stream().anyMatch(value -> value.contains("SameSite=None")));
+                })
                 .andDo(print());
+    }
+
+    @Test
+    @DisplayName("POST /api/auth/refresh - Success with valid refresh cookie")
+    void refresh_withValidRefreshCookie_shouldReturnNewAccessToken() throws Exception {
+        User user = createUser(1L, "john@example.com", "John Doe", true, "ROLE_USER");
+        UserDetails userDetails = mock(UserDetails.class);
+
+        when(jwtService.extractRole("refresh-token-value")).thenReturn("REFRESH");
+        when(jwtService.extractUsername("refresh-token-value")).thenReturn("john@example.com");
+        when(jwtService.extractUserId("refresh-token-value")).thenReturn(1L);
+        when(jwtService.extractRememberMe("refresh-token-value")).thenReturn(false);
+        when(userService.findByEmail("john@example.com")).thenReturn(user);
+        when(userDetailsService.loadUserByUsername("john@example.com")).thenReturn(userDetails);
+        when(jwtService.generateAccessToken(userDetails, "ROLE_USER", 1L)).thenReturn("new-access-token");
+
+        mockMvc.perform(post("/api/auth/refresh")
+                .cookie(new jakarta.servlet.http.Cookie("refreshToken", "refresh-token-value"))
+                .with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").value("new-access-token"))
+                .andExpect(jsonPath("$.refreshToken").value("refresh-token-value"))
+                .andDo(print());
+
+        verify(jwtService).generateAccessToken(userDetails, "ROLE_USER", 1L);
+    }
+
+    @Test
+    @DisplayName("POST /api/auth/refresh - Fail when refresh cookie is missing")
+    void refresh_withoutRefreshCookie_shouldReturnUnauthorized() throws Exception {
+        mockMvc.perform(post("/api/auth/refresh")
+                .with(csrf()))
+                .andExpect(status().isUnauthorized())
+                .andDo(print());
+    }
+
+    // ===================== AUTH ME TESTS =====================
+
+    @Test
+    @DisplayName("GET /api/auth/me - Success with authenticated user and refresh cookie")
+    @WithMockUser(username = "john@example.com", roles = "USER")
+    void me_withAuthenticatedUser_shouldReturnSessionInfo() throws Exception {
+        User user = createUser(1L, "john@example.com", "John Doe", true, "ROLE_USER");
+
+        when(userService.findByEmail("john@example.com")).thenReturn(user);
+        when(jwtService.extractExpiration("refresh-token-value")).thenReturn(new java.util.Date(123456789L));
+
+        mockMvc.perform(get("/api/auth/me")
+                .cookie(new jakarta.servlet.http.Cookie("refreshToken", "refresh-token-value")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.userId").value(1))
+                .andExpect(jsonPath("$.email").value("john@example.com"))
+                .andExpect(jsonPath("$.fullName").value("John Doe"))
+                .andExpect(jsonPath("$.role").value("USER"))
+                .andExpect(jsonPath("$.profilePictureUrl").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.refreshTokenExpiry").value(123456789L))
+                .andDo(print());
+
+        verify(userService).findByEmail("john@example.com");
+        verify(jwtService).extractExpiration("refresh-token-value");
+    }
+
+    @Test
+    @DisplayName("GET /api/auth/me - Success with access token cookie")
+    void me_withAccessTokenCookie_shouldReturnSessionInfo() throws Exception {
+        User user = createUser(2L, "jane@example.com", "Jane Doe", true, "ROLE_USER");
+        UserDetails tokenUserDetails = mock(UserDetails.class);
+
+        when(jwtService.extractUsername("access-token-value")).thenReturn("jane@example.com");
+        when(userService.findByEmail("jane@example.com")).thenReturn(user);
+        when(userDetailsService.loadUserByUsername("jane@example.com")).thenReturn(tokenUserDetails);
+        when(jwtService.isTokenValid("access-token-value", tokenUserDetails)).thenReturn(true);
+        when(jwtService.extractExpiration("refresh-token-value")).thenReturn(new java.util.Date(987654321L));
+
+        mockMvc.perform(get("/api/auth/me")
+                .cookie(new jakarta.servlet.http.Cookie("accessToken", "access-token-value"),
+                        new jakarta.servlet.http.Cookie("refreshToken", "refresh-token-value")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.userId").value(2))
+                .andExpect(jsonPath("$.email").value("jane@example.com"))
+                .andExpect(jsonPath("$.fullName").value("Jane Doe"))
+                .andExpect(jsonPath("$.role").value("USER"))
+                .andExpect(jsonPath("$.refreshTokenExpiry").value(987654321L))
+                .andDo(print());
+
+        verify(jwtService).extractUsername("access-token-value");
+        verify(userDetailsService).loadUserByUsername("jane@example.com");
+        verify(jwtService).isTokenValid("access-token-value", tokenUserDetails);
     }
 
     // ===================== VERIFY EMAIL TESTS =====================
@@ -268,11 +400,13 @@ class AuthControllerTest {
 
         when(userService.verifyEmail("valid-token")).thenReturn(user);
         when(userDetailsService.loadUserByUsername("john@example.com")).thenReturn(userDetails);
-        when(jwtService.generateToken(userDetails, "ROLE_USER", 5L)).thenReturn("jwt-token-after-verification");
+        when(jwtService.generateAccessToken(userDetails, "ROLE_USER", 5L)).thenReturn("access-token-after-verification");
+        when(jwtService.generateRefreshToken(userDetails, 5L)).thenReturn("refresh-token-after-verification");
 
         mockMvc.perform(get("/api/auth/verify-email").param("token", "valid-token"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.token").value("jwt-token-after-verification"))
+                .andExpect(jsonPath("$.accessToken").value("access-token-after-verification"))
+                .andExpect(jsonPath("$.refreshToken").value("refresh-token-after-verification"))
                 .andExpect(jsonPath("$.role").value("USER"))
                 .andExpect(jsonPath("$.email").value("john@example.com"))
                 .andExpect(jsonPath("$.fullName").value("John Doe"))
@@ -315,7 +449,9 @@ class AuthControllerTest {
     @Test
     @DisplayName("POST /api/auth/resend-verification - Success")
     void resendVerificationEmail_withValidEmail_shouldReturnSuccess() throws Exception {
-        mockMvc.perform(post("/api/auth/resend-verification").param("email", "john@example.com"))
+        mockMvc.perform(post("/api/auth/resend-verification")
+                .param("email", "john@example.com")
+                .with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value("Verification email has been sent. Please check your inbox."))
                 .andExpect(jsonPath("$.statusCode").value(200))
@@ -330,7 +466,9 @@ class AuthControllerTest {
         doThrow(new UserNotFoundException("User not found"))
                 .when(userService).resendVerificationEmail("notfound@example.com");
 
-        mockMvc.perform(post("/api/auth/resend-verification").param("email", "notfound@example.com"))
+        mockMvc.perform(post("/api/auth/resend-verification")
+                .param("email", "notfound@example.com")
+                .with(csrf()))
                 .andExpect(status().is4xxClientError())
                 .andDo(print());
     }
@@ -346,7 +484,8 @@ class AuthControllerTest {
 
         mockMvc.perform(post("/api/auth/forgot-password")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+                .content(objectMapper.writeValueAsString(request))
+                .with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value("If your email is registered, you will receive a password reset link."))
                 .andExpect(jsonPath("$.statusCode").value(200))
@@ -366,7 +505,8 @@ class AuthControllerTest {
 
         mockMvc.perform(post("/api/auth/forgot-password")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+                .content(objectMapper.writeValueAsString(request))
+                .with(csrf()))
                 .andExpect(status().is4xxClientError())
                 .andDo(print());
     }
@@ -382,7 +522,8 @@ class AuthControllerTest {
 
         mockMvc.perform(post("/api/auth/forgot-password")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+                .content(objectMapper.writeValueAsString(request))
+                .with(csrf()))
                 .andExpect(status().is4xxClientError())
                 .andDo(print());
     }
@@ -392,7 +533,8 @@ class AuthControllerTest {
     void forgotPassword_withMissingEmail_shouldReturnBadRequest() throws Exception {
         mockMvc.perform(post("/api/auth/forgot-password")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{}"))
+                .content("{}")
+                .with(csrf()))
                 .andExpect(status().isBadRequest())
                 .andDo(print());
 
@@ -408,7 +550,8 @@ class AuthControllerTest {
 
         mockMvc.perform(post("/api/auth/reset-password")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+                .content(objectMapper.writeValueAsString(request))
+                .with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value("Your password has been reset successfully. You can now login."))
                 .andExpect(jsonPath("$.statusCode").value(200))
@@ -427,7 +570,8 @@ class AuthControllerTest {
 
         mockMvc.perform(post("/api/auth/reset-password")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+                .content(objectMapper.writeValueAsString(request))
+                .with(csrf()))
                 .andExpect(status().is4xxClientError())
                 .andDo(print());
     }
@@ -442,7 +586,8 @@ class AuthControllerTest {
 
         mockMvc.perform(post("/api/auth/reset-password")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+                .content(objectMapper.writeValueAsString(request))
+                .with(csrf()))
                 .andExpect(status().is4xxClientError())
                 .andDo(print());
     }
@@ -457,7 +602,8 @@ class AuthControllerTest {
 
         mockMvc.perform(post("/api/auth/reset-password")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
+                .content(objectMapper.writeValueAsString(request))
+                .with(csrf()))
                 .andExpect(status().is4xxClientError())
                 .andDo(print());
     }
@@ -482,7 +628,8 @@ class AuthControllerTest {
     void resetPassword_withMissingFields_shouldReturnBadRequest() throws Exception {
         mockMvc.perform(post("/api/auth/reset-password")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{}"))
+                .content("{}")
+                .with(csrf()))
                 .andExpect(status().isBadRequest())
                 .andDo(print());
 
@@ -493,14 +640,13 @@ class AuthControllerTest {
 
     @Test
     @DisplayName("PUT /api/auth/change-password - Success with valid request and correct current password")
+    @WithMockUser(username = "user@example.com", roles = "USER")
     void changePassword_withValidRequest_shouldReturnSuccess() throws Exception {
         ChangePasswordRequest request = createChangePasswordRequest("OldPassword@123", "NewPassword@456", "NewPassword@456");
-        UserDetails userDetails = createUserDetails("user@example.com");
 
         mockMvc.perform(put("/api/auth/change-password")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request))
-                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(userDetails))
                 .with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value("Password changed successfully"))
@@ -512,9 +658,9 @@ class AuthControllerTest {
 
     @Test
     @DisplayName("PUT /api/auth/change-password - Fail when current password is incorrect")
+    @WithMockUser(username = "user@example.com", roles = "USER")
     void changePassword_whenCurrentPasswordIncorrect_shouldReturnBadRequest() throws Exception {
         ChangePasswordRequest request = createChangePasswordRequest("WrongPassword@123", "NewPassword@456", "NewPassword@456");
-        UserDetails userDetails = createUserDetails("user@example.com");
 
         doThrow(new InvalidPasswordException("Current password is incorrect"))
                 .when(userService).changePassword(anyString(), any(ChangePasswordRequest.class));
@@ -522,7 +668,6 @@ class AuthControllerTest {
         mockMvc.perform(put("/api/auth/change-password")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request))
-                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(userDetails))
                 .with(csrf()))
                 .andExpect(status().is4xxClientError())
                 .andDo(print());
@@ -530,9 +675,9 @@ class AuthControllerTest {
 
     @Test
     @DisplayName("PUT /api/auth/change-password - Fail when new passwords do not match")
+    @WithMockUser(username = "user@example.com", roles = "USER")
     void changePassword_whenNewPasswordsDoNotMatch_shouldReturnBadRequest() throws Exception {
         ChangePasswordRequest request = createChangePasswordRequest("OldPassword@123", "NewPassword@456", "Different@789");
-        UserDetails userDetails = createUserDetails("user@example.com");
 
         doThrow(new InvalidPasswordException("New passwords do not match"))
                 .when(userService).changePassword(anyString(), any(ChangePasswordRequest.class));
@@ -540,7 +685,6 @@ class AuthControllerTest {
         mockMvc.perform(put("/api/auth/change-password")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request))
-                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(userDetails))
                 .with(csrf()))
                 .andExpect(status().is4xxClientError())
                 .andDo(print());
@@ -548,9 +692,9 @@ class AuthControllerTest {
 
     @Test
     @DisplayName("PUT /api/auth/change-password - Fail when new password same as current password")
+    @WithMockUser(username = "user@example.com", roles = "USER")
     void changePassword_whenNewPasswordSameAsCurrent_shouldReturnBadRequest() throws Exception {
         ChangePasswordRequest request = createChangePasswordRequest("OldPassword@123", "OldPassword@123", "OldPassword@123");
-        UserDetails userDetails = createUserDetails("user@example.com");
 
         doThrow(new InvalidPasswordException("New password must be different from your current password"))
                 .when(userService).changePassword(anyString(), any(ChangePasswordRequest.class));
@@ -558,7 +702,6 @@ class AuthControllerTest {
         mockMvc.perform(put("/api/auth/change-password")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request))
-                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(userDetails))
                 .with(csrf()))
                 .andExpect(status().is4xxClientError())
                 .andDo(print());
@@ -566,9 +709,9 @@ class AuthControllerTest {
 
     @Test
     @DisplayName("PUT /api/auth/change-password - Fail when user not found")
+    @WithMockUser(username = "user@example.com", roles = "USER")
     void changePassword_whenUserNotFound_shouldReturnNotFound() throws Exception {
         ChangePasswordRequest request = createChangePasswordRequest("OldPassword@123", "NewPassword@456", "NewPassword@456");
-        UserDetails userDetails = createUserDetails("user@example.com");
 
         doThrow(new UserNotFoundException("User not found"))
                 .when(userService).changePassword(anyString(), any(ChangePasswordRequest.class));
@@ -576,7 +719,6 @@ class AuthControllerTest {
         mockMvc.perform(put("/api/auth/change-password")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request))
-                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(userDetails))
                 .with(csrf()))
                 .andExpect(status().is4xxClientError())
                 .andDo(print());
@@ -584,13 +726,11 @@ class AuthControllerTest {
 
     @Test
     @DisplayName("PUT /api/auth/change-password - Fail when validation fails")
+    @WithMockUser(username = "user@example.com", roles = "USER")
     void changePassword_withMissingFields_shouldReturnBadRequest() throws Exception {
-        UserDetails userDetails = createUserDetails("user@example.com");
-
         mockMvc.perform(put("/api/auth/change-password")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{}")
-                .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user(userDetails))
                 .with(csrf()))
                 .andExpect(status().isBadRequest())
                 .andDo(print());
