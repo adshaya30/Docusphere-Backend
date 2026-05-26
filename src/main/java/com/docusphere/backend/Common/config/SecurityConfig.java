@@ -67,6 +67,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
+        String frontendOrigin = normalizeOrigin(appConfig.getFrontendUrl());
         configuration.setAllowedOrigins(Arrays.asList(
                 appConfig.getFrontendUrl() // Use configured frontend URL from AppConfig
         ));
@@ -93,5 +94,18 @@ public class SecurityConfig {
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
         return config.getAuthenticationManager();
+    }
+
+    private String normalizeOrigin(String origin) {
+        if (origin == null) {
+            return "http://localhost:5173";
+        }
+
+        String trimmed = origin.trim();
+        if (trimmed.endsWith("/")) {
+            trimmed = trimmed.substring(0, trimmed.length() - 1);
+        }
+
+        return trimmed;
     }
 }

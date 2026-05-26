@@ -4,6 +4,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -55,6 +58,10 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<Object> handleBadCredentials(BadCredentialsException ex) {
+        if (ex.getMessage() != null && ex.getMessage().contains("Email not verified")) {
+            return buildErrorResponse(HttpStatus.UNAUTHORIZED, "EMAIL_NOT_VERIFIED", ex.getMessage());
+        }
+
         return buildErrorResponse(HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS",
                 "Invalid email or password. Please try again.");
     }
@@ -65,23 +72,32 @@ public class GlobalExceptionHandler {
                 "Authentication failed. Please check your credentials.");
     }
 
-    //  DOCUMENT 
+    // Handle @Valid body validation failures
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<Object> handleMethodArgumentNotValid(MethodArgumentNotValidException ex) {
+        String message = ex.getBindingResult()
+                .getFieldErrors()
+                .stream()
+                .map(error -> error.getField() + ": " + error.getDefaultMessage())
+                .findFirst()
+                .orElse("Validation failed for request body.");
 
-    @ExceptionHandler(DocumentNotFoundException.class)
-    public ResponseEntity<Object> handleDocumentNotFound(DocumentNotFoundException ex) {
-        return buildErrorResponse(HttpStatus.NOT_FOUND, "DOCUMENT_NOT_FOUND", ex.getMessage());
+        return buildErrorResponse(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", message);
     }
 
-    @ExceptionHandler(FileUploadException.class)
-    public ResponseEntity<Object> handleFileUploadException(FileUploadException ex) {
-        return buildErrorResponse(HttpStatus.BAD_REQUEST, "FILE_UPLOAD_ERROR", ex.getMessage());
+    // Handle missing query params like ?token= and ?email=
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<Object> handleMissingRequestParam(MissingServletRequestParameterException ex) {
+        String message = ex.getParameterName() + " parameter is required";
+        return buildErrorResponse(HttpStatus.BAD_REQUEST, "MISSING_REQUEST_PARAMETER", message);
     }
 
-    //REQUEST VALIDATION 
-
-    @ExceptionHandler(InvalidRequestException.class)
-    public ResponseEntity<Object> handleInvalidRequest(InvalidRequestException ex) {
-        return buildErrorResponse(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", ex.getMessage());
+    // Handle any other unexpected exceptions
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<Object> handleGlobalException(Exception ex) {
+        log.error("Unexpected error occurred:", ex);
+        return buildErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_SERVER_ERROR",
+                "An unexpected error occurred. Please try again later.");
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

@@ -4,6 +4,8 @@ import com.docusphere.backend.Common.config.AdminConfig;
 import com.docusphere.backend.Common.config.AppConfig;
 import com.docusphere.backend.authentication.dto.SignUpRequest;
 import com.docusphere.backend.authentication.dto.ResetPasswordRequest;
+import com.docusphere.backend.authentication.dto.UpdateProfileRequest;
+import com.docusphere.backend.authentication.dto.ChangePasswordRequest;
 import com.docusphere.backend.authentication.entity.Role;
 import com.docusphere.backend.authentication.entity.User;
 import com.docusphere.backend.authentication.entity.VerificationToken;
@@ -38,6 +40,7 @@ public class UserService {
     private final AdminConfig adminConfig;
     private final AppConfig appConfig;
     private final EmailService emailService;
+    private final SupabaseProfileStorageService supabaseProfileStorageService;
 
     @Transactional
     public void signUp(SignUpRequest dto) {
@@ -227,7 +230,75 @@ public class UserService {
         userRepository.save(user);
         passwordResetTokenRepository.delete(resetToken);
     }
+
+    @Transactional
+    public void changePassword(String email, ChangePasswordRequest request) {
+
+        User user = userRepository.findByEmail(email.toLowerCase())
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
+
+        // Check if current password is correct
+        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
+            throw new InvalidPasswordException("Current password is incorrect");
+        }
+
+        // Check new passwords match
+        if (!request.getNewPassword().equals(request.getConfirmNewPassword())) {
+            throw new InvalidPasswordException("New passwords do not match");
+        }
+
+        // Ensure new password is different from current password
+        if (passwordEncoder.matches(request.getNewPassword(), user.getPassword())) {
+            throw new InvalidPasswordException("New password must be different from your current password");
+        }
+
+        // Update password
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
+    }
+
+    
+    @Transactional
+    public User updateProfile(String email, UpdateProfileRequest request) throws Exception {
+
+        User user = userRepository.findByEmail(email.toLowerCase())
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
+
+        boolean updated = false;
+
+        // Update Full Name
+        if (request.getFullName() != null && !request.getFullName().trim().isEmpty()) {
+            user.setFullName(request.getFullName().trim());
+            updated = true;
+        }
+
+        // Delete Profile Picture
+        if (request.isRemoveProfilePicture()) {
+            if (user.getProfilePictureUrl() != null) {
+                supabaseProfileStorageService.deleteProfilePicture(user.getProfilePictureUrl());
+                user.setProfilePictureUrl(null);
+                updated = true;
+            }
+        }
+        // Upload New Profile Picture
+        else if (request.getProfilePicture() != null && !request.getProfilePicture().isEmpty()) {
+            // Delete old image if exists
+            if (user.getProfilePictureUrl() != null) {
+                supabaseProfileStorageService.deleteProfilePicture(user.getProfilePictureUrl());
+            }
+
+            String imageUrl = supabaseProfileStorageService.uploadProfilePicture(request.getProfilePicture(), user.getId());
+            user.setProfilePictureUrl(imageUrl);
+            updated = true;
+        }
+
+        if (updated) {
+            user = userRepository.save(user);
+            log.info("Profile updated successfully for user: {}", email);
+        }
+
+        return user;
+    }
+
 }
-
-
 

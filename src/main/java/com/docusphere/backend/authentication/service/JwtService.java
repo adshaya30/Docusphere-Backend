@@ -16,14 +16,17 @@ public class JwtService {
     @Value("${jwt.secret}")
     private String secretKey;
 
-    @Value("${jwt.expiration}")
-    private long jwtExpiration;
+    @Value("${jwt.access.expiration}")
+    private long accessTokenExpiration;
+
+    @Value("${jwt.refresh.expiration}")
+    private long refreshTokenExpiration;
 
     @Value("${app.session.expiry}")
-    private long SESSION_EXPIRY;
+    private long sessionRefreshTokenExpiration;
 
     @Value("${app.session.remember-me-expiry}")
-    private long REMEMBER_ME_EXPIRY;
+    private long rememberMeRefreshTokenExpiration;
 
 
     //Creates the signing key from the secret
@@ -31,18 +34,45 @@ public class JwtService {
         return Keys.hmacShaKeyFor(secretKey.getBytes());
     }
 
-    public String generateToken(UserDetails userDetails, String role, Long userId) {
-        return buildToken(userDetails, role, userId, jwtExpiration);
+    public String generateAccessToken(UserDetails userDetails, String role) {
+        return generateAccessToken(userDetails, role, null);
     }
-    public String generateToken(UserDetails userDetails, String role, Long userId, boolean rememberMe) {
-        long expiry = rememberMe ? REMEMBER_ME_EXPIRY : SESSION_EXPIRY;
-        return buildToken(userDetails, role, userId, expiry);
+
+    public String generateAccessToken(UserDetails userDetails, String role, Long userId) {
+        return buildToken(userDetails, role, userId, accessTokenExpiration);
+    }
+
+    // Generate Refresh Token (long lived)
+    public String generateRefreshToken(UserDetails userDetails) {
+        return generateRefreshToken(userDetails, null, true);
+    }
+
+    public String generateRefreshToken(UserDetails userDetails, Long userId) {
+        return generateRefreshToken(userDetails, userId, true);
+    }
+
+    public String generateRefreshToken(UserDetails userDetails, Long userId, boolean rememberMe) {
+        long refreshExpiry = rememberMe ? rememberMeRefreshTokenExpiration : sessionRefreshTokenExpiration;
+        return buildToken(userDetails, "REFRESH", userId, refreshExpiry, rememberMe);
+    }
+
+    private String buildToken(UserDetails userDetails, String role, long expiry) {
+        return buildToken(userDetails, role, null, expiry);
     }
 
     private String buildToken(UserDetails userDetails, String role, Long userId, long expiry) {
+        return buildToken(userDetails, role, userId, expiry, null);
+    }
+
+    private String buildToken(UserDetails userDetails, String role, Long userId, long expiry, Boolean rememberMe) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("role", role);
-        claims.put("userId", userId);
+        if (userId != null) {
+            claims.put("userId", userId);
+        }
+        if (rememberMe != null) {
+            claims.put("rememberMe", rememberMe);
+        }
 
         return Jwts.builder()
                 .setClaims(claims)
@@ -51,6 +81,16 @@ public class JwtService {
                 .setExpiration(new Date(System.currentTimeMillis() + expiry))
                 .signWith(getSigningKey())
                 .compact();
+    }
+
+    // Backward-compatible methods used by existing controller/tests
+    public String generateToken(UserDetails userDetails, String role, Long userId) {
+        return buildToken(userDetails, role, userId, accessTokenExpiration);
+    }
+
+    public String generateToken(UserDetails userDetails, String role, Long userId, boolean rememberMe) {
+        long expiry = rememberMe ? refreshTokenExpiration : accessTokenExpiration;
+        return buildToken(userDetails, role, userId, expiry);
     }
     public String extractUsername(String token) {
         return Jwts.parser()
@@ -76,6 +116,26 @@ public class JwtService {
                 .getPayload()
                 .get("userId", Long.class);
     }
+
+    public boolean extractRememberMe(String token) {
+        Boolean rememberMe = Jwts.parser()
+                .verifyWith(getSigningKey())
+                .build()
+                .parseSignedClaims(token)
+                .getPayload()
+                .get("rememberMe", Boolean.class);
+        return rememberMe == null || rememberMe;
+    }
+
+    public Date extractExpiration(String token) {
+        return Jwts.parser()
+                .verifyWith(getSigningKey())
+                .build()
+                .parseSignedClaims(token)
+                .getPayload()
+                .getExpiration();
+    }
+
     public boolean isTokenValid(String token, UserDetails userDetails) {
         final String username = extractUsername(token);
         return (username.equals(userDetails.getUsername()) && !isTokenExpired(token));

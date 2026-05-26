@@ -5,7 +5,7 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name="Users")
+@Table(name="users")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -34,5 +34,9 @@ public class User {
     private Role role;
 
     private LocalDateTime createdAt=LocalDateTime.now();
+
+
+    @Column(name = "profile_picture_url", length = 1000)
+    private String profilePictureUrl;
 
 }
