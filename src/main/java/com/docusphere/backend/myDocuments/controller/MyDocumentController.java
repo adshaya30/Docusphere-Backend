@@ -10,6 +10,7 @@ import jakarta.validation.constraints.Min;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import jakarta.servlet.http.HttpServletRequest;
 
 import java.util.UUID;
 
@@ -36,14 +37,27 @@ public class MyDocumentController {
             @RequestParam(value = "type", required = false) String type,
             @RequestParam(value = "search", required = false) String search,
             @RequestParam(value = "starred", required = false) Boolean starred,
-            @RequestHeader("Authorization") String token
+            HttpServletRequest request
     )
     {
-        if (token == null || !token.startsWith("Bearer ")) {
-            throw new InvalidRequestException("Authorization header with Bearer token is required");
+        String authHeader = request.getHeader("Authorization");
+        String token = null;
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            token = authHeader.substring(7);
+        } else if (request.getCookies() != null) {
+            for (jakarta.servlet.http.Cookie c : request.getCookies()) {
+                if ("accessToken".equalsIgnoreCase(c.getName()) || "jwt".equalsIgnoreCase(c.getName()) || "Authorization".equalsIgnoreCase(c.getName())) {
+                    token = c.getValue();
+                    break;
+                }
+            }
         }
 
-        Long ownerId = jwtService.extractUserId(token.substring(7));
+        if (token == null || token.isBlank()) {
+            throw new InvalidRequestException("Authorization header or accessToken cookie is required");
+        }
+
+        Long ownerId = jwtService.extractUserId(token);
         UUID parsedTeamId = (teamId != null && !teamId.isBlank()) ? UUID.fromString(teamId.trim()) : null;
 
         MyDocumentsPageResponse response = service.getDocuments(
