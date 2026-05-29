@@ -35,7 +35,8 @@ public class AuthController {
     private static final String ACCESS_TOKEN_COOKIE = "accessToken";
     private static final String REFRESH_TOKEN_COOKIE = "refreshToken";
     private static final String REFRESH_COOKIE_PATH = "/api/auth/refresh";
-    private static final String COOKIE_SAME_SITE = "None";
+    private static final String COOKIE_SAME_SITE_PROD = "None";
+    private static final String COOKIE_SAME_SITE_DEV = "Lax";
 
     private final UserService userService;
     private final JwtService jwtService;
@@ -47,6 +48,9 @@ public class AuthController {
 
     @Value("${app.session.remember-me-expiry}")
     private long rememberMeRefreshCookieMaxAge;
+
+    @Value("${app.frontend-url:http://localhost:5173}")
+    private String frontendUrl;
 
     @PostMapping("/signUp")
     public ResponseEntity<MessageResponse> register(@Valid @RequestBody SignUpRequest request) {
@@ -257,8 +261,8 @@ public class AuthController {
     private ResponseCookie createCookie(String name, String value, String path, Duration maxAge) {
         return ResponseCookie.from(name, value)
                 .httpOnly(true)
-                .secure(true)
-                .sameSite(COOKIE_SAME_SITE)
+                .secure(isCookieSecure())
+                .sameSite(getCookieSameSite())
                 .path(path)
                 .maxAge(maxAge)
                 .build();
@@ -267,8 +271,8 @@ public class AuthController {
     private ResponseCookie createSessionCookie(String name, String value, String path) {
         return ResponseCookie.from(name, value)
                 .httpOnly(true)
-                .secure(true)
-                .sameSite(COOKIE_SAME_SITE)
+                .secure(isCookieSecure())
+                .sameSite(getCookieSameSite())
                 .path(path)
                 .build();
     }
@@ -276,11 +280,19 @@ public class AuthController {
     private ResponseCookie clearCookie(String name, String path) {
         return ResponseCookie.from(name, "")
                 .httpOnly(true)
-                .secure(true)
-                .sameSite(COOKIE_SAME_SITE)
+                .secure(isCookieSecure())
+                .sameSite(getCookieSameSite())
                 .path(path)
                 .maxAge(Duration.ZERO)
                 .build();
+    }
+
+    private boolean isCookieSecure() {
+        return frontendUrl != null && frontendUrl.startsWith("https://");
+    }
+
+    private String getCookieSameSite() {
+        return isCookieSecure() ? COOKIE_SAME_SITE_PROD : COOKIE_SAME_SITE_DEV;
     }
 
 }
