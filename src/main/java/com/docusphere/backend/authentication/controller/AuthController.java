@@ -123,6 +123,28 @@ public class AuthController {
 
     }
 
+    @PostMapping("/oauth2/login")
+    public ResponseEntity<AuthResponse> oauth2Login(@Valid @RequestBody OAuth2LoginRequest request) {
+        User user = userService.processOAuth2User(
+                request.getEmail(),
+                request.getName(),
+                request.getPicture(),
+                request.getProvider()
+        );
+
+        UserDetails userDetails = userDetailsService.loadUserByUsername(user.getEmail());
+        String accessToken = jwtService.generateAccessToken(userDetails, user.getRole().getName(), user.getId());
+        String refreshToken = jwtService.generateRefreshToken(userDetails, user.getId());
+
+        return withAuthCookies(
+                accessToken,
+                refreshToken,
+                user,
+                user.getRole().getName().replace("ROLE_", ""),
+                true
+        );
+    }
+
     @PostMapping("/refresh")
     public ResponseEntity<AuthResponse> refresh(@CookieValue(name = REFRESH_TOKEN_COOKIE, required = false) String refreshToken) {
         if (refreshToken == null || refreshToken.isBlank()) {
