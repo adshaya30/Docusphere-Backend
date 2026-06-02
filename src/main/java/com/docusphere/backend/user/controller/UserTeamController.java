@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -45,16 +45,30 @@ public class UserTeamController {
         this.jwtService = jwtService;
     }
 
-    private Long getUserId(String token) {
-        if (token != null && token.startsWith("Bearer ")) {
-            return jwtService.extractUserId(token.substring(7));
+    private Long getUserId(HttpServletRequest request) {
+        String authHeader = request.getHeader("Authorization");
+        String token = null;
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            token = authHeader.substring(7);
+        } else if (request.getCookies() != null) {
+            for (jakarta.servlet.http.Cookie c : request.getCookies()) {
+                if ("accessToken".equalsIgnoreCase(c.getName()) || "jwt".equalsIgnoreCase(c.getName()) || "Authorization".equalsIgnoreCase(c.getName())) {
+                    token = c.getValue();
+                    break;
+                }
+            }
         }
-        throw new IllegalArgumentException("Invalid or missing Authorization header");
+
+        if (token != null && !token.isBlank()) {
+            return jwtService.extractUserId(token);
+        }
+
+        throw new IllegalArgumentException("Invalid or missing Authorization token or accessToken cookie");
     }
 
     @GetMapping
-    public ResponseEntity<List<TeamDto>> getMyTeams(@RequestHeader("Authorization") String token) {
-        Long userId = getUserId(token);
+    public ResponseEntity<List<TeamDto>> getMyTeams(HttpServletRequest request) {
+        Long userId = getUserId(request);
         
         // Auto-link pending invitations before returning teams
         userTeamService.processPendingInvitations(userId);
@@ -69,8 +83,8 @@ public class UserTeamController {
     }
 
     @GetMapping("/{teamId}")
-    public ResponseEntity<TeamDto> getTeamById(@PathVariable UUID teamId, @RequestHeader("Authorization") String token) {
-        Long userId = getUserId(token);
+    public ResponseEntity<TeamDto> getTeamById(@PathVariable UUID teamId, HttpServletRequest request) {
+        Long userId = getUserId(request);
         if (!teamService.isUserInTeam(userId, teamId)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
@@ -80,8 +94,8 @@ public class UserTeamController {
     }
 
     @GetMapping("/{teamId}/members")
-    public ResponseEntity<List<TeamMemberDto>> getTeamMembers(@PathVariable UUID teamId, @RequestHeader("Authorization") String token) {
-        Long userId = getUserId(token);
+    public ResponseEntity<List<TeamMemberDto>> getTeamMembers(@PathVariable UUID teamId, HttpServletRequest request) {
+        Long userId = getUserId(request);
         if (!teamService.isUserInTeam(userId, teamId)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
@@ -89,8 +103,8 @@ public class UserTeamController {
     }
 
     @GetMapping("/{teamId}/members/status")
-    public ResponseEntity<List<UserStatusDto>> getTeamMemberStatuses(@PathVariable UUID teamId, @RequestHeader("Authorization") String token) {
-        Long userId = getUserId(token);
+    public ResponseEntity<List<UserStatusDto>> getTeamMemberStatuses(@PathVariable UUID teamId, HttpServletRequest request) {
+        Long userId = getUserId(request);
         if (!teamService.isUserInTeam(userId, teamId)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
@@ -98,8 +112,8 @@ public class UserTeamController {
     }
 
     @GetMapping("/{teamId}/documents")
-    public ResponseEntity<List<DocumentSummaryDto>> getTeamDocuments(@PathVariable UUID teamId, @RequestHeader("Authorization") String token) {
-        Long userId = getUserId(token);
+    public ResponseEntity<List<DocumentSummaryDto>> getTeamDocuments(@PathVariable UUID teamId, HttpServletRequest request) {
+        Long userId = getUserId(request);
         if (!teamService.isUserInTeam(userId, teamId)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
@@ -107,43 +121,43 @@ public class UserTeamController {
     }
 
     @PostMapping
-    public ResponseEntity<TeamDto> createTeam(@RequestBody TeamDto request, @RequestHeader("Authorization") String token) {
-        Long userId = getUserId(token);
+    public ResponseEntity<TeamDto> createTeam(@RequestBody TeamDto request, HttpServletRequest httpRequest) {
+        Long userId = getUserId(httpRequest);
         TeamDto created = userTeamService.createTeam(request.getName(), request.getDescription(), request.getMembers(), userId);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
     @DeleteMapping("/{teamId}")
-    public ResponseEntity<Void> deleteTeam(@PathVariable UUID teamId, @RequestHeader("Authorization") String token) {
-        Long userId = getUserId(token);
+    public ResponseEntity<Void> deleteTeam(@PathVariable UUID teamId, HttpServletRequest request) {
+        Long userId = getUserId(request);
         userTeamService.deleteTeam(teamId, userId);
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{teamId}/members")
-    public ResponseEntity<TeamMemberDto> addMember(@PathVariable UUID teamId, @RequestBody AddMemberRequest request, @RequestHeader("Authorization") String token) {
-        Long userId = getUserId(token);
+    public ResponseEntity<TeamMemberDto> addMember(@PathVariable UUID teamId, @RequestBody AddMemberRequest request, HttpServletRequest httpRequest) {
+        Long userId = getUserId(httpRequest);
         TeamMemberDto added = userTeamService.addMember(teamId, request, userId);
         return ResponseEntity.status(HttpStatus.CREATED).body(added);
     }
 
     @DeleteMapping("/{teamId}/members/{memberId}")
-    public ResponseEntity<Void> removeMember(@PathVariable UUID teamId, @PathVariable Long memberId, @RequestHeader("Authorization") String token) {
-        Long userId = getUserId(token);
+    public ResponseEntity<Void> removeMember(@PathVariable UUID teamId, @PathVariable Long memberId, HttpServletRequest request) {
+        Long userId = getUserId(request);
         userTeamService.removeMember(teamId, memberId, userId);
         return ResponseEntity.noContent().build();
     }
 
     @PutMapping("/{teamId}/members/{memberId}/role")
-    public ResponseEntity<Void> updateMemberRole(@PathVariable UUID teamId, @PathVariable Long memberId, @RequestBody AddMemberRequest request, @RequestHeader("Authorization") String token) {
-        Long userId = getUserId(token);
+    public ResponseEntity<Void> updateMemberRole(@PathVariable UUID teamId, @PathVariable Long memberId, @RequestBody AddMemberRequest request, HttpServletRequest httpRequest) {
+        Long userId = getUserId(httpRequest);
         userTeamService.updateMemberRole(teamId, memberId, request.getRole(), userId);
         return ResponseEntity.ok().build();
     }
 
     @DeleteMapping("/{teamId}/documents/{documentId}")
-    public ResponseEntity<Void> deleteDocument(@PathVariable UUID teamId, @PathVariable UUID documentId, @RequestHeader("Authorization") String token) {
-        Long userId = getUserId(token);
+    public ResponseEntity<Void> deleteDocument(@PathVariable UUID teamId, @PathVariable UUID documentId, HttpServletRequest request) {
+        Long userId = getUserId(request);
         userDocumentService.deleteDocument(documentId, userId, teamId);
         return ResponseEntity.noContent().build();
     }

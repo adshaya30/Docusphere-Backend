@@ -11,6 +11,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import jakarta.servlet.http.HttpServletRequest;
 
 import java.util.UUID;
 
@@ -30,9 +31,9 @@ public class DocumentSharingController {
     public ResponseEntity<ApiResponse<CreateShareLinkResponse>> createShareLink(
             @PathVariable("id") UUID documentId,
             @Valid @RequestBody CreateShareLinkRequest request,
-            @RequestHeader("Authorization") String token
+            HttpServletRequest httpRequest
     ) {
-        Long requesterId = extractRequesterId(token);
+        Long requesterId = extractRequesterId(httpRequest);
         CreateShareLinkResponse response = documentSharingService.createShareLink(requesterId, documentId, request);
         return ResponseEntity.ok(ApiResponse.success("Share link created successfully", response));
     }
@@ -41,9 +42,9 @@ public class DocumentSharingController {
     public ResponseEntity<ApiResponse<Void>> revokeShareLink(
             @PathVariable("id") UUID documentId,
             @RequestParam("token") String shareToken,
-            @RequestHeader("Authorization") String token
+            HttpServletRequest httpRequest
     ) {
-        Long requesterId = extractRequesterId(token);
+        Long requesterId = extractRequesterId(httpRequest);
         documentSharingService.revokeShareLink(requesterId, documentId, shareToken);
         return ResponseEntity.ok(ApiResponse.success("Share link revoked successfully", null));
     }
@@ -56,10 +57,24 @@ public class DocumentSharingController {
         return ResponseEntity.ok(ApiResponse.success("Shared document fetched successfully", response));
     }
 
-    private Long extractRequesterId(String token) {
-        if (token == null || !token.startsWith("Bearer ")) {
-            throw new InvalidRequestException("Authorization header with Bearer token is required");
+    private Long extractRequesterId(HttpServletRequest request) {
+        String authHeader = request.getHeader("Authorization");
+        String token = null;
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            token = authHeader.substring(7);
+        } else if (request.getCookies() != null) {
+            for (jakarta.servlet.http.Cookie c : request.getCookies()) {
+                if ("accessToken".equalsIgnoreCase(c.getName()) || "jwt".equalsIgnoreCase(c.getName()) || "Authorization".equalsIgnoreCase(c.getName())) {
+                    token = c.getValue();
+                    break;
+                }
+            }
         }
-        return jwtService.extractUserId(token.substring(7));
+
+        if (token == null || token.isBlank()) {
+            throw new InvalidRequestException("Authorization header or accessToken cookie is required");
+        }
+
+        return jwtService.extractUserId(token);
     }
 }
