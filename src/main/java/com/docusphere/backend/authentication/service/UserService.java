@@ -79,6 +79,46 @@ public class UserService {
         sendVerificationEmailAsync(user.getEmail(), verificationLink);
     }
 
+    @Transactional
+    public User processOAuth2User(String email, String fullName, String picture, String provider) {
+        if (email == null || email.isBlank()) {
+            throw new InvalidRequestException("Email is required");
+        }
+
+        if (provider != null && !provider.isBlank()) {
+            log.debug("Processing OAuth2 user from provider: {}", provider);
+        }
+
+        String normalizedEmail = email.trim().toLowerCase();
+        String resolvedFullName = (fullName == null || fullName.isBlank())
+                ? normalizedEmail
+                : fullName.trim();
+
+        java.util.Optional<User> existingUser = userRepository.findByEmail(normalizedEmail);
+
+        if (existingUser.isPresent()) {
+            User user = existingUser.get();
+            user.setFullName(resolvedFullName);
+            if (picture != null && !picture.isBlank()) {
+                user.setProfilePictureUrl(picture);
+            }
+            return userRepository.save(user);
+        }
+
+        User newUser = new User();
+        newUser.setEmail(normalizedEmail);
+        newUser.setFullName(resolvedFullName);
+        newUser.setProfilePictureUrl((picture == null || picture.isBlank()) ? null : picture);
+        newUser.setEnabled(true);
+        newUser.setPassword(passwordEncoder.encode(UUID.randomUUID().toString()));
+
+        String roleName = isAdminEmail(normalizedEmail) ? "ROLE_ADMIN" : "ROLE_USER";
+        Role role = getOrCreateRole(roleName);
+        newUser.setRole(role);
+
+        return userRepository.save(newUser);
+    }
+
     // Send email asynchronously without blocking the response
     private void sendVerificationEmailAsync(String email, String verificationLink) {
         new Thread(() -> {
@@ -205,9 +245,7 @@ public class UserService {
         }
 
         PasswordResetToken resetToken = passwordResetTokenRepository.findByToken(request.getToken())
-                .orElseThrow(() -> {
-                    return new InvalidTokenException("Invalid or expired reset link");
-                });
+                .orElseThrow(() -> new InvalidTokenException("Invalid or expired reset link"));
 
         if (resetToken.isExpired()) {
             throw new TokenExpiredException("This reset link has expired. Please request a new one.");
