@@ -138,18 +138,19 @@ public class DocumentActionController {
     public ResponseEntity<Resource> download(
             @PathVariable("id") UUID documentId,
             @RequestHeader(value = "Authorization", required = false) String token,
-            @RequestParam(value = "token", required = false) String shareToken
+            @RequestParam(value = "token", required = false) String shareToken,
+            @RequestParam(value = "password", required = false) String password
     ) {
         Resource resource;
         String fileName;
 
         if (shareToken != null && !shareToken.isBlank()) {
-            resource = service.downloadByShareToken(documentId, shareToken);
-            fileName = service.resolveDownloadFilenameByShareToken(documentId, shareToken);
+            resource = service.downloadByShareToken(documentId, shareToken, password);
+            fileName = service.resolveDownloadFilenameByShareToken(documentId, shareToken, password);
         } else {
             Long requesterId = extractRequesterId(token);
-            resource = service.download(requesterId, documentId);
-            fileName = service.resolveDownloadFilename(requesterId, documentId);
+            resource = service.download(requesterId, documentId, password);
+            fileName = service.resolveDownloadFilename(requesterId, documentId, password);
         }
 
         return ResponseEntity.ok()

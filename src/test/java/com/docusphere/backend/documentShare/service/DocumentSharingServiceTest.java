@@ -142,6 +142,27 @@ class DocumentSharingServiceTest {
     }
 
     @Test
+    @DisplayName("Should reject EDIT permission for public share links")
+    void testCreateShareLink_Public_EditPermission_ThrowsException() {
+        // Arrange
+        CreateShareLinkRequest request = new CreateShareLinkRequest();
+        request.setType(ShareLinkType.PUBLIC);
+        request.setPermission(DocumentSharePermission.EDIT);
+
+        when(documentRepository.findByIdAndDeletedFalse(documentId))
+                .thenReturn(Optional.of(mockDocument));
+
+        // Act & Assert
+        InvalidRequestException exception = assertThrows(
+                InvalidRequestException.class,
+                () -> documentSharingService.createShareLink(requesterId, documentId, request)
+        );
+
+        assertEquals("EDIT permission is only allowed for EMAIL_INVITE share type", exception.getMessage());
+        verify(documentShareRepository, never()).save(any());
+    }
+
+    @Test
     @DisplayName("Should successfully create email invite share link")
     void testCreateShareLink_EmailInvite_Success() {
         // Arrange
@@ -183,6 +204,47 @@ class DocumentSharingServiceTest {
         verify(emailService, times(1)).sendDocumentShareEmail(
                 anyString(), anyString(), anyString(), anyString()
         );
+    }
+
+    @Test
+    @DisplayName("Should successfully create email invite share link with EDIT permission")
+    void testCreateShareLink_EmailInvite_EditPermission_Success() {
+        // Arrange
+        CreateShareLinkRequest request = new CreateShareLinkRequest();
+        request.setType(ShareLinkType.EMAIL_INVITE);
+        request.setPermission(DocumentSharePermission.EDIT);
+        request.setEmail("editor@example.com");
+
+        when(documentRepository.findByIdAndDeletedFalse(documentId))
+                .thenReturn(Optional.of(mockDocument));
+        when(userRepository.findById(requesterId))
+                .thenReturn(Optional.of(mockUser));
+
+        DocumentShare savedShare = DocumentShare.builder()
+                .id(UUID.randomUUID())
+                .document(mockDocument)
+                .token("edit-token-789")
+                .permission(DocumentSharePermission.EDIT)
+                .type(ShareLinkType.EMAIL_INVITE)
+                .email("editor@example.com")
+                .expiresAt(null)
+                .revoked(false)
+                .createdBy(requesterId)
+                .build();
+
+        when(documentShareRepository.save(any())).thenReturn(savedShare);
+        when(appConfig.getFrontendUrl()).thenReturn("http://localhost:5173");
+
+        // Act
+        CreateShareLinkResponse response = documentSharingService.createShareLink(
+                requesterId, documentId, request
+        );
+
+        // Assert
+        assertNotNull(response);
+        assertEquals(DocumentSharePermission.EDIT, response.getPermission());
+        assertEquals(ShareLinkType.EMAIL_INVITE, response.getType());
+        assertEquals("editor@example.com", response.getEmail());
     }
 
     @Test
@@ -306,7 +368,42 @@ class DocumentSharingServiceTest {
         assertEquals(documentId, response.getDocumentId());
         assertEquals("Test Document", response.getName());
         assertEquals(DocumentSharePermission.VIEW, response.getPermission());
+        assertTrue(response.isCanView());
         assertFalse(response.isCanComment());
+        assertFalse(response.isCanEdit());
+    }
+
+    @Test
+    @DisplayName("Should expose view, comment, and edit capabilities for EDIT shares")
+    void testOpenSharedDocument_EditPermissionCapabilities() {
+        // Arrange
+        String shareToken = "edit-token-123";
+
+        DocumentShare documentShare = DocumentShare.builder()
+                .id(UUID.randomUUID())
+                .document(mockDocument)
+                .token(shareToken)
+                .permission(DocumentSharePermission.EDIT)
+                .type(ShareLinkType.EMAIL_INVITE)
+                .revoked(false)
+                .build();
+
+        when(documentShareRepository.findByToken(shareToken))
+                .thenReturn(Optional.of(documentShare));
+        when(documentRepository.findByIdAndDeletedFalse(documentId))
+                .thenReturn(Optional.of(mockDocument));
+        when(documentShareRepository.isExpired(any(DocumentShare.class), any(LocalDateTime.class)))
+                .thenReturn(false);
+
+        // Act
+        SharedDocumentResponse response = documentSharingService.openSharedDocument(shareToken);
+
+        // Assert
+        assertNotNull(response);
+        assertEquals(DocumentSharePermission.EDIT, response.getPermission());
+        assertTrue(response.isCanView());
+        assertTrue(response.isCanComment());
+        assertTrue(response.isCanEdit());
     }
 
     @Test
@@ -380,6 +477,29 @@ class DocumentSharingServiceTest {
         );
 
         assertEquals("Share link expired", exception.getMessage());
+    }
+
+    @Test
+    @DisplayName("Should allow comment permission checks for EDIT shares")
+    void testRequireCommentPermission_EditShare_Succeeds() {
+        // Arrange
+        String shareToken = "commentable-edit-token";
+
+        DocumentShare documentShare = DocumentShare.builder()
+                .id(UUID.randomUUID())
+                .document(mockDocument)
+                .token(shareToken)
+                .permission(DocumentSharePermission.EDIT)
+                .revoked(false)
+                .build();
+
+        when(documentShareRepository.findByToken(shareToken))
+                .thenReturn(Optional.of(documentShare));
+        when(documentShareRepository.isExpired(any(DocumentShare.class), any(LocalDateTime.class)))
+                .thenReturn(false);
+
+        // Act & Assert
+        assertDoesNotThrow(() -> documentSharingService.requireCommentPermission(documentId, shareToken));
     }
 
     // ==================== REVOKE SHARE LINK TESTS ====================

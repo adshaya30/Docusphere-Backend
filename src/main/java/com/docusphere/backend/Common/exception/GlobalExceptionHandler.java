@@ -29,6 +29,11 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(HttpStatus.BAD_REQUEST, "INVALID_PASSWORD", ex.getMessage());
     }
 
+    @ExceptionHandler(DocumentPasswordRequiredException.class)
+    public ResponseEntity<Object> handleDocumentPasswordRequired(DocumentPasswordRequiredException ex) {
+        return buildErrorResponse(HttpStatus.UNAUTHORIZED, "DOCUMENT_PASSWORD_REQUIRED", ex.getMessage());
+    }
+
     @ExceptionHandler(UserNotFoundException.class)
     public ResponseEntity<Object> handleUserNotFound(UserNotFoundException ex) {
         return buildErrorResponse(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", ex.getMessage());

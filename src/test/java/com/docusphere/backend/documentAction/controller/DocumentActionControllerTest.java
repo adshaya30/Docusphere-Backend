@@ -463,9 +463,9 @@ class DocumentActionControllerTest {
         String shareToken = "valid-share-token";
         byte[] fileContent = "test file content".getBytes();
 
-        when(documentActionService.downloadByShareToken(documentId, shareToken))
+        when(documentActionService.downloadByShareToken(documentId, shareToken, null))
                 .thenReturn(new ByteArrayResource(fileContent));
-        when(documentActionService.resolveDownloadFilenameByShareToken(documentId, shareToken))
+        when(documentActionService.resolveDownloadFilenameByShareToken(documentId, shareToken, null))
                 .thenReturn("Test Document.pdf");
 
         // Act & Assert
@@ -474,8 +474,8 @@ class DocumentActionControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(header().exists("Content-Disposition"));
 
-        verify(documentActionService, times(1)).downloadByShareToken(documentId, shareToken);
-        verify(documentActionService, times(1)).resolveDownloadFilenameByShareToken(documentId, shareToken);
+        verify(documentActionService, times(1)).downloadByShareToken(documentId, shareToken, null);
+        verify(documentActionService, times(1)).resolveDownloadFilenameByShareToken(documentId, shareToken, null);
     }
 
     @Test
@@ -484,7 +484,7 @@ class DocumentActionControllerTest {
         // Arrange
         String invalidToken = "invalid-token";
 
-        when(documentActionService.downloadByShareToken(documentId, invalidToken))
+        when(documentActionService.downloadByShareToken(documentId, invalidToken, null))
                 .thenThrow(new DocumentNotFoundException("Share link not found"));
 
         // Act & Assert
@@ -500,9 +500,9 @@ class DocumentActionControllerTest {
         String shareToken = "valid-token";
         byte[] fileContent = new byte[1024];
 
-        when(documentActionService.downloadByShareToken(documentId, shareToken))
+        when(documentActionService.downloadByShareToken(documentId, shareToken, null))
                 .thenReturn(new ByteArrayResource(fileContent));
-        when(documentActionService.resolveDownloadFilenameByShareToken(documentId, shareToken))
+        when(documentActionService.resolveDownloadFilenameByShareToken(documentId, shareToken, null))
                 .thenReturn("MyDocument.pdf");
 
         // Act & Assert
