@@ -37,9 +37,9 @@ public class DocumentActionController {
     public ResponseEntity<ApiResponse<DocumentActionResponse>> rename(
             @PathVariable("id") UUID documentId,
             @Valid @RequestBody RenameRequest request,
-            @RequestHeader("Authorization") String token
+            HttpServletRequest httpRequest
     ) {
-        Long requesterId = extractRequesterId(token);
+        Long requesterId = extractRequesterId(httpRequest);
         return ResponseEntity.ok(
                 ApiResponse.success(
                         "Document renamed",
@@ -52,9 +52,9 @@ public class DocumentActionController {
     public ResponseEntity<ApiResponse<DocumentActionResponse>> move(
             @PathVariable("id") UUID documentId,
             @Valid @RequestBody MoveRequest request,
-            @RequestHeader("Authorization") String token
+            HttpServletRequest httpRequest
     ) {
-        Long requesterId = extractRequesterId(token);
+        Long requesterId = extractRequesterId(httpRequest);
         UUID targetTeamId = request.getTeamId() == null || request.getTeamId().isBlank()
                 ? null
                 : UUID.fromString(request.getTeamId().trim());
@@ -70,9 +70,9 @@ public class DocumentActionController {
     @PostMapping("/{id}/duplicate")
     public ResponseEntity<ApiResponse<DocumentActionResponse>> duplicate(
             @PathVariable("id") UUID documentId,
-            @RequestHeader("Authorization") String token
+            HttpServletRequest httpRequest
     ) {
-        Long requesterId = extractRequesterId(token);
+        Long requesterId = extractRequesterId(httpRequest);
         return ResponseEntity.ok(
                 ApiResponse.success(
                         "Document duplicated",
@@ -84,9 +84,9 @@ public class DocumentActionController {
     @DeleteMapping("/{id}/trash")
     public ResponseEntity<ApiResponse<DocumentActionResponse>> moveToTrash(
             @PathVariable("id") UUID documentId,
-            @RequestHeader("Authorization") String token
+            HttpServletRequest httpRequest
     ) {
-        Long requesterId = extractRequesterId(token);
+        Long requesterId = extractRequesterId(httpRequest);
         return ResponseEntity.ok(
                 ApiResponse.success(
                         "Document moved to trash",
@@ -98,9 +98,9 @@ public class DocumentActionController {
     @PostMapping("/{id}/restore")
     public ResponseEntity<ApiResponse<DocumentActionResponse>> restoreFromTrash(
             @PathVariable("id") UUID documentId,
-            @RequestHeader("Authorization") String token
+            HttpServletRequest httpRequest
     ) {
-        Long requesterId = extractRequesterId(token);
+        Long requesterId = extractRequesterId(httpRequest);
         return ResponseEntity.ok(
                 ApiResponse.success(
                         "Document restored from trash",
@@ -112,9 +112,9 @@ public class DocumentActionController {
     @DeleteMapping("/{id}/permanent")
     public ResponseEntity<ApiResponse<Void>> permanentlyDelete(
             @PathVariable("id") UUID documentId,
-            @RequestHeader("Authorization") String token
+            HttpServletRequest request
     ) {
-        Long requesterId = extractRequesterId(token);
+        Long requesterId = extractRequesterId(request);
         service.permanentlyDelete(requesterId, documentId);
         return ResponseEntity.ok(ApiResponse.success("Document permanently deleted", null));
     }
@@ -123,9 +123,9 @@ public class DocumentActionController {
     public ResponseEntity<ApiResponse<TrashDocumentsPageResponse>> getTrashDocuments(
             @RequestParam(value = "page", defaultValue = "0") @Min(0) int page,
             @RequestParam(value = "size", defaultValue = "15") @Min(1) @Max(100) int size,
-            @RequestHeader("Authorization") String token
+            HttpServletRequest request
     ) {
-        Long requesterId = extractRequesterId(token);
+        Long requesterId = extractRequesterId(request);
         return ResponseEntity.ok(
                 ApiResponse.success(
                         "Trash documents fetched successfully",
@@ -159,7 +159,7 @@ public class DocumentActionController {
                 .body(resource);
     }
 
-    private Long extractRequesterId(String token) {
+   private Long extractRequesterId(String token) {
         if (token == null || !token.startsWith("Bearer ")) {
             throw new InvalidRequestException("Authorization header with Bearer token is required");
         }

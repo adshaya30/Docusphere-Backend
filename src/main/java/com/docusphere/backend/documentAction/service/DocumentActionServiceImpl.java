@@ -436,7 +436,7 @@ public class DocumentActionServiceImpl implements DocumentActionService {
         return value.trim();
     }
 
-    private DocumentActionResponse toResponse(Document doc) {
+   private DocumentActionResponse toResponse(Document doc) {
         return DocumentActionResponse.builder()
                 .documentId(doc.getId())
                 .name(doc.getName())
@@ -465,4 +465,5 @@ public class DocumentActionServiceImpl implements DocumentActionService {
                 .updatedAt(doc.getUpdatedAt())
                 .build();
     }
+
 }

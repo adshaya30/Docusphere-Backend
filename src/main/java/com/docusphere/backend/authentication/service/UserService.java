@@ -4,6 +4,8 @@ import com.docusphere.backend.Common.config.AdminConfig;
 import com.docusphere.backend.Common.config.AppConfig;
 import com.docusphere.backend.authentication.dto.SignUpRequest;
 import com.docusphere.backend.authentication.dto.ResetPasswordRequest;
+import com.docusphere.backend.authentication.dto.UpdateProfileRequest;
+import com.docusphere.backend.authentication.dto.ChangePasswordRequest;
 import com.docusphere.backend.authentication.entity.Role;
 import com.docusphere.backend.authentication.entity.User;
 import com.docusphere.backend.authentication.entity.VerificationToken;
@@ -38,6 +40,7 @@ public class UserService {
     private final AdminConfig adminConfig;
     private final AppConfig appConfig;
     private final EmailService emailService;
+    private final SupabaseProfileStorageService supabaseProfileStorageService;
 
     @Transactional
     public void signUp(SignUpRequest dto) {
@@ -74,6 +77,46 @@ public class UserService {
         // Send verification email asynchronously
         String verificationLink = appConfig.getFrontendUrl() + "/verify-email?token=" + token;
         sendVerificationEmailAsync(user.getEmail(), verificationLink);
+    }
+
+    @Transactional
+    public User processOAuth2User(String email, String fullName, String picture, String provider) {
+        if (email == null || email.isBlank()) {
+            throw new InvalidRequestException("Email is required");
+        }
+
+        if (provider != null && !provider.isBlank()) {
+            log.debug("Processing OAuth2 user from provider: {}", provider);
+        }
+
+        String normalizedEmail = email.trim().toLowerCase();
+        String resolvedFullName = (fullName == null || fullName.isBlank())
+                ? normalizedEmail
+                : fullName.trim();
+
+        java.util.Optional<User> existingUser = userRepository.findByEmail(normalizedEmail);
+
+        if (existingUser.isPresent()) {
+            User user = existingUser.get();
+            user.setFullName(resolvedFullName);
+            if (picture != null && !picture.isBlank()) {
+                user.setProfilePictureUrl(picture);
+            }
+            return userRepository.save(user);
+        }
+
+        User newUser = new User();
+        newUser.setEmail(normalizedEmail);
+        newUser.setFullName(resolvedFullName);
+        newUser.setProfilePictureUrl((picture == null || picture.isBlank()) ? null : picture);
+        newUser.setEnabled(true);
+        newUser.setPassword(passwordEncoder.encode(UUID.randomUUID().toString()));
+
+        String roleName = isAdminEmail(normalizedEmail) ? "ROLE_ADMIN" : "ROLE_USER";
+        Role role = getOrCreateRole(roleName);
+        newUser.setRole(role);
+
+        return userRepository.save(newUser);
     }
 
     // Send email asynchronously without blocking the response
@@ -202,9 +245,7 @@ public class UserService {
         }
 
         PasswordResetToken resetToken = passwordResetTokenRepository.findByToken(request.getToken())
-                .orElseThrow(() -> {
-                    return new InvalidTokenException("Invalid or expired reset link");
-                });
+                .orElseThrow(() -> new InvalidTokenException("Invalid or expired reset link"));
 
         if (resetToken.isExpired()) {
             throw new TokenExpiredException("This reset link has expired. Please request a new one.");
@@ -227,7 +268,75 @@ public class UserService {
         userRepository.save(user);
         passwordResetTokenRepository.delete(resetToken);
     }
+
+    @Transactional
+    public void changePassword(String email, ChangePasswordRequest request) {
+
+        User user = userRepository.findByEmail(email.toLowerCase())
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
+
+        // Check if current password is correct
+        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
+            throw new InvalidPasswordException("Current password is incorrect");
+        }
+
+        // Check new passwords match
+        if (!request.getNewPassword().equals(request.getConfirmNewPassword())) {
+            throw new InvalidPasswordException("New passwords do not match");
+        }
+
+        // Ensure new password is different from current password
+        if (passwordEncoder.matches(request.getNewPassword(), user.getPassword())) {
+            throw new InvalidPasswordException("New password must be different from your current password");
+        }
+
+        // Update password
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
+    }
+
+    
+    @Transactional
+    public User updateProfile(String email, UpdateProfileRequest request) throws Exception {
+
+        User user = userRepository.findByEmail(email.toLowerCase())
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
+
+        boolean updated = false;
+
+        // Update Full Name
+        if (request.getFullName() != null && !request.getFullName().trim().isEmpty()) {
+            user.setFullName(request.getFullName().trim());
+            updated = true;
+        }
+
+        // Delete Profile Picture
+        if (request.isRemoveProfilePicture()) {
+            if (user.getProfilePictureUrl() != null) {
+                supabaseProfileStorageService.deleteProfilePicture(user.getProfilePictureUrl());
+                user.setProfilePictureUrl(null);
+                updated = true;
+            }
+        }
+        // Upload New Profile Picture
+        else if (request.getProfilePicture() != null && !request.getProfilePicture().isEmpty()) {
+            // Delete old image if exists
+            if (user.getProfilePictureUrl() != null) {
+                supabaseProfileStorageService.deleteProfilePicture(user.getProfilePictureUrl());
+            }
+
+            String imageUrl = supabaseProfileStorageService.uploadProfilePicture(request.getProfilePicture(), user.getId());
+            user.setProfilePictureUrl(imageUrl);
+            updated = true;
+        }
+
+        if (updated) {
+            user = userRepository.save(user);
+            log.info("Profile updated successfully for user: {}", email);
+        }
+
+        return user;
+    }
+
 }
-
-
 

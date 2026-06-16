@@ -18,6 +18,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.UUID;
@@ -65,14 +66,27 @@ public class DocumentUploadController {
             @RequestParam("chunkIndex") @Min(0) int chunkIndex,
             @RequestParam("totalChunks") @Min(1) int totalChunks,
             @RequestParam(value = "teamId", required = false) String teamId,
-            @RequestHeader("Authorization") String token
+            HttpServletRequest request
     ) {
 
-        if (token == null || !token.startsWith("Bearer ")) {
-            throw new InvalidRequestException("Authorization header with Bearer token is required");
+        String authHeader = request.getHeader("Authorization");
+        String token = null;
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            token = authHeader.substring(7);
+        } else if (request.getCookies() != null) {
+            for (jakarta.servlet.http.Cookie c : request.getCookies()) {
+                if ("accessToken".equalsIgnoreCase(c.getName()) || "jwt".equalsIgnoreCase(c.getName()) || "Authorization".equalsIgnoreCase(c.getName())) {
+                    token = c.getValue();
+                    break;
+                }
+            }
         }
 
-        Long ownerId = jwtService.extractUserId(token.substring(7));
+        if (token == null || token.isBlank()) {
+            throw new InvalidRequestException("Authorization header or accessToken cookie is required");
+        }
+
+        Long ownerId = jwtService.extractUserId(token);
         UUID parsedTeamId = parseOptionalTeamId(teamId);
 
         LOGGER.debug("Chunk upload: fileId={}, chunkIndex={}/{}",

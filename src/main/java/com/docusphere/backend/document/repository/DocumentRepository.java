@@ -3,6 +3,10 @@ package com.docusphere.backend.document.repository;
 import com.docusphere.backend.document.entity.Document;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+//
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.stereotype.Repository;
@@ -38,4 +42,17 @@ public interface DocumentRepository extends JpaRepository<Document, UUID>,
     Page<Document> findByOwnerIdAndTeamIdAndDeletedFalse(Long ownerId, UUID teamId, Pageable pageable);
 
     List<Document> findAllByTeamId(UUID teamId);
-}
+
+
+
+    boolean existsByOwnerIdAndUpdatedAtAfter(Long ownerId, LocalDateTime cutoff);
+
+    // Update ALL documents that belong to oldTeamId and move them to newTeamId(MERGE TEAM : ADMIN)
+    @Modifying
+    @Query("UPDATE Document d SET d.teamId = :newTeamId WHERE d.teamId = :oldTeamId")
+    void updateAllTeamId(@Param("oldTeamId") UUID oldTeamId, @Param("newTeamId") UUID newTeamId);
+
+    @Modifying
+    void deleteByTeamId(UUID teamId);
+
+    }
