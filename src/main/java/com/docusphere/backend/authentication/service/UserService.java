@@ -98,10 +98,9 @@ public class UserService {
 
         if (existingUser.isPresent()) {
             User user = existingUser.get();
+        
             user.setFullName(resolvedFullName);
-            if (picture != null && !picture.isBlank()) {
-                user.setProfilePictureUrl(picture);
-            }
+        
             return userRepository.save(user);
         }
 

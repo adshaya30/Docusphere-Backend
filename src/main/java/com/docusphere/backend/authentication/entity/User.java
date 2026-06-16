@@ -38,5 +38,4 @@ public class User {
 
     @Column(name = "profile_picture_url", length = 1000)
     private String profilePictureUrl;
-
 }
