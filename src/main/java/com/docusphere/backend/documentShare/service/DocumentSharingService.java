@@ -102,7 +102,10 @@ public class DocumentSharingService {
                 .sizeBytes(document.getSizeBytes())
                 .fileUrl(document.getFileUrl())
                 .permission(share.getPermission())
-                .canComment(share.getPermission() == DocumentSharePermission.COMMENT)
+                .canView(share.getPermission().canView())
+                .canComment(share.getPermission().canComment())
+                .canEdit(share.getPermission().canEdit())
+                .passwordProtected(document.isPasswordProtected())
                 .build();
     }
 
@@ -141,7 +144,7 @@ public class DocumentSharingService {
         if (!share.getDocument().getId().equals(documentId)) {
             throw new UnauthorizedAccessException("Share token does not belong to this document");
         }
-        if (share.getPermission() != DocumentSharePermission.COMMENT) {
+        if (!share.getPermission().canComment()) {
             throw new UnauthorizedAccessException("Comment permission is required");
         }
     }
@@ -170,6 +173,9 @@ public class DocumentSharingService {
         }
         if (request.getType() == ShareLinkType.PUBLIC && request.getEmail() != null && !request.getEmail().isBlank()) {
             throw new InvalidRequestException("email must be empty for PUBLIC share type");
+        }
+        if (request.getType() == ShareLinkType.PUBLIC && request.getPermission() == DocumentSharePermission.EDIT) {
+            throw new InvalidRequestException("EDIT permission is only allowed for EMAIL_INVITE share type");
         }
     }
 

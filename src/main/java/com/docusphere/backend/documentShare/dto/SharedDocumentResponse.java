@@ -15,5 +15,8 @@ public class SharedDocumentResponse {
     private Long sizeBytes;
     private String fileUrl;
     private DocumentSharePermission permission;
+    private boolean canView;
     private boolean canComment;
+    private boolean canEdit;
+    private boolean passwordProtected;
 }
