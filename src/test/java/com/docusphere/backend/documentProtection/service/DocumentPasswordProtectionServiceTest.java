@@ -7,6 +7,7 @@ import com.docusphere.backend.document.repository.DocumentRepository;
 import com.docusphere.backend.documentAction.service.TeamAccessValidator;
 import com.docusphere.backend.documentProtection.dto.DocumentProtectionResponse;
 import com.docusphere.backend.documentProtection.dto.PasswordVerificationResponse;
+import com.docusphere.backend.Common.util.PasswordValidator;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -31,6 +32,9 @@ class DocumentPasswordProtectionServiceTest {
     @Mock
     private TeamAccessValidator teamAccessValidator;
 
+    @Mock
+    private PasswordValidator passwordValidator;
+
     private PasswordEncoder passwordEncoder;
     private DocumentPasswordVerificationStore verificationStore;
     private DocumentPasswordAccessGuard accessGuard;
@@ -48,7 +52,8 @@ class DocumentPasswordProtectionServiceTest {
                 documentRepository,
                 passwordEncoder,
                 accessGuard,
-                verificationStore
+                verificationStore,
+                passwordValidator
         );
 
         documentId = UUID.randomUUID();

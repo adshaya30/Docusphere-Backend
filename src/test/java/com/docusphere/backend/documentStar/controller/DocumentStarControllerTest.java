@@ -2,6 +2,7 @@ package com.docusphere.backend.documentStar.controller;
 
 import com.docusphere.backend.Common.exception.DocumentNotFoundException;
 import com.docusphere.backend.authentication.service.JwtService;
+import com.docusphere.backend.authentication.service.security.CustomUserDetailsService;
 import com.docusphere.backend.documentStar.dto.DocumentStarResponse;
 import com.docusphere.backend.documentStar.service.DocumentStarService;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,6 +36,9 @@ class DocumentStarControllerTest {
 
     @MockitoBean
     private JwtService jwtService;
+
+    @MockitoBean
+    private CustomUserDetailsService customUserDetailsService;
 
     private UUID documentId;
     private Long userId;
@@ -195,7 +199,7 @@ class DocumentStarControllerTest {
         // Act & Assert
         mockMvc.perform(post("/api/documents/{documentId}/star", documentId)
                 .param("userId", "invalid-id"))
-                .andExpect(status().isInternalServerError());
+                .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -203,7 +207,7 @@ class DocumentStarControllerTest {
     void testStar_MissingUserId_BadRequest() throws Exception {
         // Act & Assert
         mockMvc.perform(post("/api/documents/{documentId}/star", documentId))
-                .andExpect(status().isInternalServerError());
+                .andExpect(status().isBadRequest());
     }
 
     // ==================== UNSTAR TESTS ====================
@@ -331,7 +335,7 @@ class DocumentStarControllerTest {
         // Act & Assert
         mockMvc.perform(delete("/api/documents/{documentId}/star", documentId)
                 .param("userId", "invalid-id"))
-                .andExpect(status().isInternalServerError());
+                .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -339,7 +343,7 @@ class DocumentStarControllerTest {
     void testUnstar_MissingUserId_BadRequest() throws Exception {
         // Act & Assert
         mockMvc.perform(delete("/api/documents/{documentId}/star", documentId))
-                .andExpect(status().isInternalServerError());
+                .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -348,7 +352,7 @@ class DocumentStarControllerTest {
         // Act & Assert
         mockMvc.perform(post("/api/documents/invalid-uuid/star")
                 .param("userId", userId.toString()))
-                .andExpect(status().isInternalServerError());
+                .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -357,7 +361,7 @@ class DocumentStarControllerTest {
         // Act & Assert
         mockMvc.perform(delete("/api/documents/invalid-uuid/star")
                 .param("userId", userId.toString()))
-                .andExpect(status().isInternalServerError());
+                .andExpect(status().isBadRequest());
     }
 
     @Test

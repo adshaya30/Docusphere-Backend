@@ -58,13 +58,37 @@ public class SecurityConfig {
                         .requestMatchers("/", "/login", "/error", "/favicon.ico").permitAll()
                         .requestMatchers("/oauth2/**", "/api/auth/oauth2/callback/**").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
-                        .requestMatchers("/api/ocr/**").permitAll()
+                        .requestMatchers("/api/ocr/**").authenticated()
                         .requestMatchers("/api/share/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/documents/*/download").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/onlyoffice/callback").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/admin/**").hasRole("ADMIN")
                         .requestMatchers("/user/**").hasAnyRole("USER", "ADMIN")
                         .anyRequest().authenticated())
+                .exceptionHandling(exceptions -> exceptions
+                        .authenticationEntryPoint((request, response, authException) -> {
+                            response.setContentType("application/json;charset=UTF-8");
+                            response.setStatus(jakarta.servlet.http.HttpServletResponse.SC_UNAUTHORIZED);
+                            
+                            String message = "Unauthorized access";
+                            Exception jwtEx = (Exception) request.getAttribute("jwt_exception");
+                            if (jwtEx != null) {
+                                if (jwtEx instanceof io.jsonwebtoken.ExpiredJwtException) {
+                                    message = "Token has expired";
+                                } else if (jwtEx instanceof io.jsonwebtoken.security.SignatureException) {
+                                    message = "Invalid token signature";
+                                } else if (jwtEx instanceof io.jsonwebtoken.MalformedJwtException) {
+                                    message = "Malformed token structure";
+                                } else {
+                                    message = "Invalid token: " + jwtEx.getMessage();
+                                }
+                            } else if (authException != null) {
+                                message = authException.getMessage();
+                            }
+                            
+                            response.getWriter().write(String.format("{\"error\": \"Unauthorized\", \"message\": \"%s\"}", message));
+                        }))
                 // Tell Spring Security to not create sessions since we're using JWTs
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authenticationProvider(daoAuthenticationProvider())

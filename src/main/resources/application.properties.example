@@ -1,22 +1,21 @@
 # Database Configuration - PostgreSQL
-spring.datasource.url=${DB_URL}&prepareThreshold=0
+spring.datasource.url=${DB_URL}
 spring.datasource.username=${DB_USERNAME}
 spring.datasource.password=${DB_PASSWORD}
 spring.datasource.driver-class-name=org.postgresql.Driver
+
 # Supabase Configuration
 supabase.url=${SUPABASE_URL}
 supabase.service.key=${SUPABASE_SERVICE_KEY}
 supabase.bucket.documents=${SUPABASE_BUCKET}
 supabase.bucket.profile=profile-pictures
 
-
 # Connection Pooling
-spring.datasource.hikari.maximum-pool-size=5
+spring.datasource.hikari.maximum-pool-size=10
 spring.datasource.hikari.minimum-idle=2
 spring.datasource.hikari.connection-timeout=20000
-spring.datasource.hikari.idle-timeout=10000
+spring.datasource.hikari.idle-timeout=600000
 spring.datasource.hikari.max-lifetime=1800000
-spring.datasource.hikari.data-source-properties.prepareThreshold=0
 
 # JPA Configuration
 spring.jpa.database-platform=org.hibernate.dialect.PostgreSQLDialect
@@ -26,16 +25,13 @@ spring.jpa.properties.hibernate.format_sql=true
 spring.jpa.properties.hibernate.jdbc.batch_size=20
 
 # Flyway Configuration
-spring.flyway.enabled=false
+spring.flyway.enabled=true
 spring.flyway.locations=classpath:db/migration
 spring.flyway.baselineOnMigrate=true
-# Temporary - only for repair
-spring.flyway.repair=true
 spring.flyway.validate-on-migrate=false
 
-
 # Admin Configuration
-app.admin-emails=${ADMIN_EMAILS:yaliads30@gmail.com,2003adshaya@gmail.com,niroja0226@gmail.com}
+app.admin-emails=${ADMIN_EMAILS:}
 app.frontend-url=${APP_FRONTEND_URL:http://localhost:5173}
 
 # Email Configuration - Gmail
@@ -51,19 +47,13 @@ spring.mail.properties.mail.smtp.socketFactory.class=javax.net.ssl.SSLSocketFact
 
 # JWT Configuration
 jwt.secret=${JWT_SECRET}
-jwt.expiration=86400000
-jwt.access.expiration=900000
+jwt.access.expiration=86400000
 jwt.refresh.expiration=604800000
 
 # Session Configuration
-# Session expiry: 1 day (milliseconds)
 app.session.expiry=86400000
-# Remember-me expiry: 7 days (milliseconds)
 app.session.remember-me-expiry=604800000
 
-
-
-# Optional but recommended for dev
 spring.flyway.baseline-on-migrate=true
 spring.flyway.baseline-version=1
 
@@ -84,24 +74,8 @@ app.upload.dir=${APP_UPLOAD_DIR:${user.dir}/uploads}
 app.document.cleanup.cron=${DOCUMENT_CLEANUP_CRON:0 0 2 * * *}
 app.share.default-expiry-hours=${APP_SHARE_DEFAULT_EXPIRY_HOURS:24}
 
-# Maximum chunk size (5MB allows frontend control of 5MB chunks without Tomcat failing)
 spring.servlet.multipart.max-file-size=50MB
-
-# Maximum request size (entire multipart request limit per chunk)
 spring.servlet.multipart.max-request-size=100MB
-
-# Google OAuth2
-spring.security.oauth2.client.registration.google.client-id=${GOOGLE_CLIENT_ID}
-spring.security.oauth2.client.registration.google.client-secret=${GOOGLE_CLIENT_SECRET}
-spring.security.oauth2.client.registration.google.scope=openid,email,profile
-spring.security.oauth2.client.registration.google.redirect-uri={baseUrl}/login/oauth2/code/{registrationId}
-spring.security.oauth2.client.provider.google.user-name-attribute=sub
 
 # Logging Configuration
 logging.level.org.springframework.security=DEBUG
-logging.file.name=backend-live.log
-
-# ONLYOFFICE Configuration
-app.onlyoffice.callback-url=${APP_ONLYOFFICE_CALLBACK_URL:http://host.docker.internal:8080/api/onlyoffice/callback}
-app.onlyoffice.jwt.secret=${APP_ONLYOFFICE_JWT_SECRET:V8pX9iu5gDWzQrHP5Od62XOOiuOnlrtF}
-

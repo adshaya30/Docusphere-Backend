@@ -3,6 +3,7 @@ package com.docusphere.backend.upload.controller;
 import com.docusphere.backend.Common.exception.GlobalExceptionHandler;
 import com.docusphere.backend.authentication.service.JwtService;
 import com.docusphere.backend.upload.service.DocumentUploadService;
+import com.docusphere.backend.authentication.service.security.CustomUserDetailsService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -36,6 +37,9 @@ class DocumentUploadControllerTest {
 
     @MockitoBean
     private JwtService jwtService;
+
+    @MockitoBean
+    private CustomUserDetailsService customUserDetailsService;
 
     @Test
     void initUpload_shouldReturnFileIdForValidPayload() throws Exception {
@@ -213,6 +217,6 @@ class DocumentUploadControllerTest {
                         .header("Authorization", "token-without-bearer-prefix"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errorCode").value("INVALID_REQUEST"))
-                .andExpect(jsonPath("$.message").value("Authorization header with Bearer token is required"));
+                .andExpect(jsonPath("$.message").value("Authorization header or accessToken cookie is required"));
     }
 }

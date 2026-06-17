@@ -67,3 +67,4 @@ docusphere.db
 scratch/
 .env
 startup.log
+src/main/resources/docusphere-ocr-7af6c7033da4.json

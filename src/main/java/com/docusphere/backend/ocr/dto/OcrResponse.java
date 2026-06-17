@@ -17,4 +17,5 @@ public class OcrResponse {
     private List<String> tags;
     private List<String> keyPoints;
     private String summary;
+    private String extractedText;
 }

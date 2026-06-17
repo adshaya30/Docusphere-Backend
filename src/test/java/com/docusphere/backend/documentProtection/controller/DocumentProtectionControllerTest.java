@@ -1,6 +1,7 @@
 package com.docusphere.backend.documentProtection.controller;
 
 import com.docusphere.backend.authentication.service.JwtService;
+import com.docusphere.backend.authentication.service.security.CustomUserDetailsService;
 import com.docusphere.backend.documentProtection.dto.DocumentProtectionResponse;
 import com.docusphere.backend.documentProtection.dto.PasswordVerificationResponse;
 import com.docusphere.backend.documentProtection.service.DocumentPasswordProtectionService;
@@ -32,6 +33,9 @@ class DocumentProtectionControllerTest {
 
     @MockitoBean
     private JwtService jwtService;
+
+    @MockitoBean
+    private CustomUserDetailsService customUserDetailsService;
 
     @Test
     void enableProtection_shouldReturnSuccess() throws Exception {

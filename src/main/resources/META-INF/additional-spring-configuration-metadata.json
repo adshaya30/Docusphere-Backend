@@ -1,21 +1,6 @@
 {
   "properties": [
     {
-      "name": "ocr.python.executable",
-      "type": "java.lang.String",
-      "description": "Path to the Python executable used for OCR processing."
-    },
-    {
-      "name": "ocr.python.script.path",
-      "type": "java.lang.String",
-      "description": "Path to the PaddleOCR Python script."
-    },
-    {
-      "name": "ocr.analysis.script.path",
-      "type": "java.lang.String",
-      "description": "Path to the AI Text Analysis Python script."
-    },
-    {
       "name": "jwt.secret",
       "type": "java.lang.String",
       "description": "Base64 encoded secret key for JWT signing."

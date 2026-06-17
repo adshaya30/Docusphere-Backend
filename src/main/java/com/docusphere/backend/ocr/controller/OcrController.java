@@ -5,6 +5,7 @@ import com.docusphere.backend.ocr.service.OcrJobManager;
 import com.docusphere.backend.ocr.service.OcrUploadService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -13,6 +14,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/ocr")
 @RequiredArgsConstructor
+@Lazy
 @Slf4j
 public class OcrController {
     

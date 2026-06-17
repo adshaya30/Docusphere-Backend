@@ -8,7 +8,10 @@ import org.springframework.stereotype.Service;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.springframework.context.annotation.Lazy;
+
 @Service
+@Lazy
 public class OcrJobManager {
     
     @Data
@@ -26,6 +29,19 @@ public class OcrJobManager {
     private final Map<String, JobStatus> jobs = new ConcurrentHashMap<>();
 
     public String createJob(String filename) {
+        // Cleanup jobs older than 1 hour to prevent memory leak
+        long cutoff = System.currentTimeMillis() - java.util.concurrent.TimeUnit.HOURS.toMillis(1);
+        int removed = 0;
+        for (java.util.Iterator<java.util.Map.Entry<String, JobStatus>> it = jobs.entrySet().iterator(); it.hasNext(); ) {
+            if (it.next().getValue().getStartTime() < cutoff) {
+                it.remove();
+                removed++;
+            }
+        }
+        if (removed > 0) {
+            org.slf4j.LoggerFactory.getLogger(OcrJobManager.class).info("Cleaned up {} expired OCR jobs (older than 1 hour).", removed);
+        }
+
         String jobId = java.util.UUID.randomUUID().toString();
         jobs.put(jobId, JobStatus.builder()
                 .jobId(jobId)
