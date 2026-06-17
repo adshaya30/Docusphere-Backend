@@ -9,20 +9,29 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseCookie;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClientService;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestTemplate;
 
 import java.io.IOException;
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 
 @Component
@@ -40,6 +49,7 @@ public class OAuth2AuthenticationSuccessHandler implements AuthenticationSuccess
     private final JwtService jwtService;
     private final AppConfig appConfig;
     private final UserDetailsService userDetailsService;
+    private final OAuth2AuthorizedClientService authorizedClientService;
 
     @Value("${jwt.access.expiration}")
     private long accessTokenCookieMaxAge;
@@ -61,8 +71,20 @@ public class OAuth2AuthenticationSuccessHandler implements AuthenticationSuccess
 
         Map<String, Object> attributes = oauth2User.getAttributes();
         String email = resolveEmail(authentication, oauth2User, attributes);
+        if ((email == null || email.isBlank()) && "github".equalsIgnoreCase(provider)) {
+            OAuth2AuthenticationToken oauthToken = (OAuth2AuthenticationToken) authentication;
+            OAuth2AuthorizedClient client = authorizedClientService.loadAuthorizedClient(
+                    oauthToken.getAuthorizedClientRegistrationId(),
+                    oauthToken.getName()
+            );
+
+            if (client != null && client.getAccessToken() != null) {
+                email = fetchGithubEmail(client.getAccessToken().getTokenValue());
+            }
+        }
+
         if (email == null || email.isBlank()) {
-            throw new BadCredentialsException("OAuth2 login did not return an email address.");
+            throw new BadCredentialsException("Unable to get email from GitHub.");
         }
 
         String fullName = resolveFullName(oauth2User, attributes);
@@ -88,6 +110,41 @@ public class OAuth2AuthenticationSuccessHandler implements AuthenticationSuccess
             return "http://localhost:5173";
         }
         return frontendUrl;
+    }
+
+    private String fetchGithubEmail(String accessToken) {
+        try {
+            RestTemplate restTemplate = new RestTemplate();
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setBearerAuth(accessToken);
+            headers.setAccept(List.of(MediaType.APPLICATION_JSON));
+
+            HttpEntity<Void> entity = new HttpEntity<>(headers);
+
+            ResponseEntity<List<Map<String, Object>>> response =
+                    restTemplate.exchange(
+                            "https://api.github.com/user/emails",
+                            HttpMethod.GET,
+                            entity,
+                            new ParameterizedTypeReference<List<Map<String, Object>>>() {
+                            }
+                    );
+
+            if (response.getBody() == null) {
+                return null;
+            }
+
+            return response.getBody().stream()
+                    .filter(email -> Boolean.TRUE.equals(email.get("primary")))
+                    .filter(email -> Boolean.TRUE.equals(email.get("verified")))
+                    .map(email -> (String) email.get("email"))
+                    .findFirst()
+                    .orElse(null);
+
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private String getAttribute(Map<String, Object> attributes, String key) {

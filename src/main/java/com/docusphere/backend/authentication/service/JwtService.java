@@ -56,10 +56,6 @@ public class JwtService {
         return buildToken(userDetails, "REFRESH", userId, refreshExpiry, rememberMe);
     }
 
-    private String buildToken(UserDetails userDetails, String role, long expiry) {
-        return buildToken(userDetails, role, null, expiry);
-    }
-
     private String buildToken(UserDetails userDetails, String role, Long userId, long expiry) {
         return buildToken(userDetails, role, userId, expiry, null);
     }
@@ -75,12 +71,12 @@ public class JwtService {
         }
 
         return Jwts.builder()
-                .setClaims(claims)
-                .setSubject(userDetails.getUsername())
-                .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + expiry))
-                .signWith(getSigningKey())
-                .compact();
+        .claims(claims)
+        .subject(userDetails.getUsername())
+        .issuedAt(new Date())
+        .expiration(new Date(System.currentTimeMillis() + expiry))
+        .signWith(getSigningKey())
+        .compact();
     }
 
     // Backward-compatible methods used by existing controller/tests

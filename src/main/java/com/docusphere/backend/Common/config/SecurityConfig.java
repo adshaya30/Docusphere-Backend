@@ -12,7 +12,6 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.web.SecurityFilterChain;
@@ -47,20 +46,24 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                .csrf(csrf -> csrf.disable())
-                .oauth2Login(oauth2 -> oauth2.successHandler(oAuth2AuthenticationSuccessHandler))
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/", "/error", "/favicon.ico").permitAll()
-                        .requestMatchers("/oauth2/**", "/login/**").permitAll()
-                        .requestMatchers("/api/auth/**").permitAll()
-                        .requestMatchers("/api/share/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/documents/*/download").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/api/documents/*/verify-password").permitAll()
-                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                        .requestMatchers("/admin/**").hasRole("ADMIN")
-                        .requestMatchers("/user/**").hasAnyRole("USER", "ADMIN")
-                        .anyRequest().authenticated())
+        .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+        .csrf(csrf -> csrf.disable())
+        .oauth2Login(oauth2 -> oauth2
+                .loginPage("/login")
+                .authorizationEndpoint(authz -> authz.baseUri("/oauth2/authorize"))
+                .redirectionEndpoint(redir -> redir.baseUri("/api/auth/oauth2/callback/*"))
+                .successHandler(oAuth2AuthenticationSuccessHandler)
+        )
+        .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/", "/login", "/error", "/favicon.ico").permitAll()
+                .requestMatchers("/oauth2/**", "/api/auth/oauth2/callback/**").permitAll()
+                .requestMatchers("/api/auth/**").permitAll()
+                .requestMatchers("/api/share/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/documents/*/download").permitAll()
+                .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                .requestMatchers("/admin/**").hasRole("ADMIN")
+                .requestMatchers("/user/**").hasAnyRole("USER", "ADMIN")
+                .anyRequest().authenticated())
                 // Tell Spring Security to not create sessions since we're using JWTs
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authenticationProvider(daoAuthenticationProvider())
@@ -85,13 +88,13 @@ public class SecurityConfig {
         return source;
     }
 
-    // Configure the DaoAuthenticationProvider to use our custom UserDetailsService
-    // and password encoder
     @Bean
     public AuthenticationProvider daoAuthenticationProvider() {
-        DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
-        provider.setUserDetailsService(userDetailsService);
+        DaoAuthenticationProvider provider =
+                new DaoAuthenticationProvider(userDetailsService);
+    
         provider.setPasswordEncoder(passwordEncoder);
+    
         return provider;
     }
 
