@@ -4,10 +4,12 @@ import com.docusphere.backend.Common.exception.DocumentNotFoundException;
 import com.docusphere.backend.Common.exception.FileUploadException;
 import com.docusphere.backend.Common.exception.InvalidRequestException;
 import com.docusphere.backend.Common.exception.UnauthorizedAccessException;
+import com.docusphere.backend.audit.service.AuditService;
 import com.docusphere.backend.document.entity.Document;
 import com.docusphere.backend.document.repository.DocumentRepository;
 import com.docusphere.backend.documentShare.service.DocumentSharingService;
 import com.docusphere.backend.document.storage.FileStorageService;
+import com.docusphere.backend.documentProtection.service.DocumentPasswordProtectionService;
 import com.docusphere.backend.documentAction.dto.DocumentActionResponse;
 import com.docusphere.backend.documentAction.dto.TrashDocumentItemResponse;
 import com.docusphere.backend.documentAction.dto.TrashDocumentsPageResponse;
@@ -27,9 +29,11 @@ import org.springframework.web.client.RestTemplate;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.time.LocalDateTime;
 import java.util.UUID;
+import java.util.HashMap;
 
 @Service
 public class DocumentActionServiceImpl implements DocumentActionService {
@@ -37,11 +41,33 @@ public class DocumentActionServiceImpl implements DocumentActionService {
     private final DocumentRepository documentRepository;
     private final FileStorageService fileStorageService;
     private final TeamAccessValidator teamAccessValidator;
-    @Autowired(required = false)
-    private DocumentSharingService documentSharingService;
+    private final AuditService auditService;
+    private final DocumentSharingService documentSharingService;
+    private final DocumentPasswordProtectionService documentPasswordProtectionService;
     private final String supabaseUrl;
     private final String bucketName;
     private final RestTemplate restTemplate = new RestTemplate();
+
+    @Autowired
+    public DocumentActionServiceImpl(
+            DocumentRepository documentRepository,
+            FileStorageService fileStorageService,
+            TeamAccessValidator teamAccessValidator,
+            AuditService auditService,
+            DocumentSharingService documentSharingService,
+            DocumentPasswordProtectionService documentPasswordProtectionService,
+            @Value("${supabase.url}") String supabaseUrl,
+            @Value("${supabase.bucket.documents:documents}") String bucketName
+    ) {
+        this.documentRepository = documentRepository;
+        this.fileStorageService = fileStorageService;
+        this.teamAccessValidator = teamAccessValidator;
+        this.auditService = auditService;
+        this.documentSharingService = documentSharingService;
+        this.documentPasswordProtectionService = documentPasswordProtectionService;
+        this.supabaseUrl = supabaseUrl;
+        this.bucketName = bucketName;
+    }
 
     public DocumentActionServiceImpl(
             DocumentRepository documentRepository,
@@ -50,11 +76,7 @@ public class DocumentActionServiceImpl implements DocumentActionService {
             @Value("${supabase.url}") String supabaseUrl,
             @Value("${supabase.bucket.documents:documents}") String bucketName
     ) {
-        this.documentRepository = documentRepository;
-        this.fileStorageService = fileStorageService;
-        this.teamAccessValidator = teamAccessValidator;
-        this.supabaseUrl = supabaseUrl;
-        this.bucketName = bucketName;
+        this(documentRepository, fileStorageService, teamAccessValidator, null, null, null, supabaseUrl, bucketName);
     }
 
     @Override
@@ -86,6 +108,26 @@ public class DocumentActionServiceImpl implements DocumentActionService {
             }
         }
 
+        // Block moving password-protected documents into Team Spaces.
+        // Requirement: if document is secured && destination is a Team (targetTeamId != null) -> reject
+        if (targetTeamId != null && document.isPasswordProtected()) {
+            // Record audit entry if audit service available
+            if (auditService != null) {
+                try {
+                    Map<String, Object> meta = new HashMap<>();
+                    meta.put("documentId", documentId.toString());
+                    meta.put("ownerId", document.getOwnerId());
+                    meta.put("requesterId", requesterId);
+                    meta.put("targetTeamId", targetTeamId.toString());
+                    auditService.record("MOVE_BLOCKED_PROTECTED_FILE", meta);
+                } catch (Exception ex) {
+                    // never fail the request because audit failed
+                }
+            }
+
+            throw new InvalidRequestException("Password protected documents cannot be moved to Team Spaces. Remove protection first or use Share.");
+        }
+
         document.setTeamId(targetTeamId);
         return toResponse(documentRepository.save(document));
     }
@@ -114,6 +156,7 @@ public class DocumentActionServiceImpl implements DocumentActionService {
                 .fileUrl(generateNewUrl(duplicatedStorageKey))
                 .status(original.getStatus())
                 .secured(original.isSecured())
+                .passwordHash(original.isSecured() ? original.getPasswordHash() : null)
                 .deleted(false)
                 .build();
 
@@ -184,38 +227,54 @@ public class DocumentActionServiceImpl implements DocumentActionService {
 
     @Override
     @Transactional(readOnly = true)
-    public Resource download(Long requesterId, UUID documentId) {
+    public Resource download(Long requesterId, UUID documentId, String password) {
         Document document = requireActiveDocument(documentId);
         ensureAccessible(document, requesterId);
+        ensurePasswordVerified(document, password, requesterId, null);
         return new ByteArrayResource(loadDocumentBytes(document));
     }
 
     @Override
     @Transactional(readOnly = true)
-    public String resolveDownloadFilename(Long requesterId, UUID documentId) {
+    public String resolveDownloadFilename(Long requesterId, UUID documentId, String password) {
         Document document = requireActiveDocument(documentId);
         ensureAccessible(document, requesterId);
+        ensurePasswordVerified(document, password, requesterId, null);
         return document.getName();
     }
 
     @Override
     @Transactional(readOnly = true)
-    public Resource downloadByShareToken(UUID documentId, String token) {
+    public Resource downloadByShareToken(UUID documentId, String token, String password) {
         if (documentSharingService == null) {
             throw new FileUploadException("Document sharing service is not available");
         }
         Document document = documentSharingService.checkReadAccessByShareToken(documentId, token);
+        ensurePasswordVerified(document, password, null, token);
         return new ByteArrayResource(loadDocumentBytes(document));
     }
 
     @Override
     @Transactional(readOnly = true)
-    public String resolveDownloadFilenameByShareToken(UUID documentId, String token) {
+    public String resolveDownloadFilenameByShareToken(UUID documentId, String token, String password) {
         if (documentSharingService == null) {
             throw new FileUploadException("Document sharing service is not available");
         }
         Document document = documentSharingService.checkReadAccessByShareToken(documentId, token);
+        ensurePasswordVerified(document, password, null, token);
         return document.getName();
+    }
+
+    private void ensurePasswordVerified(Document document, String password, Long requesterId, String shareToken) {
+        if (documentPasswordProtectionService == null) {
+            return;
+        }
+        documentPasswordProtectionService.requirePasswordForContentAccess(
+                document,
+                password,
+                requesterId,
+                shareToken
+        );
     }
 
     private Document requireActiveDocument(UUID documentId) {

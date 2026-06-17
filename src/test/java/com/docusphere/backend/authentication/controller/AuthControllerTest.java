@@ -787,38 +787,4 @@ class AuthControllerTest {
         return user;
     }
 
-    // ===================== USER DETAILS HELPER METHODS =====================
-
-    /**
-     * Creates UserDetails for a regular USER
-     */
-    private UserDetails createUserDetails(String email) {
-        return org.springframework.security.core.userdetails.User.builder()
-                .username(email)
-                .password("password")
-                .authorities("ROLE_USER")
-                .build();
-    }
-
-    /**
-     * Creates UserDetails for an ADMIN (with both ROLE_ADMIN and ROLE_USER)
-     */
-    private UserDetails createAdminDetails(String email) {
-        return org.springframework.security.core.userdetails.User.builder()
-                .username(email)
-                .password("password")
-                .authorities("ROLE_ADMIN", "ROLE_USER")
-                .build();
-    }
-
-    /**
-     * Creates UserDetails with custom authorities
-     */
-    private UserDetails createUserDetailsWithAuthorities(String email, String... authorities) {
-        return org.springframework.security.core.userdetails.User.builder()
-                .username(email)
-                .password("password")
-                .authorities(authorities)
-                .build();
-    }
 }

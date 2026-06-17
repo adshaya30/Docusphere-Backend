@@ -546,7 +546,7 @@ class DocumentActionServiceImplTest {
                 .thenReturn(fileContent);
 
         // Act
-        var resource = documentActionService.downloadByShareToken(documentId, shareToken);
+        var resource = documentActionService.downloadByShareToken(documentId, shareToken, null);
 
         // Assert
         assertNotNull(resource);
@@ -564,7 +564,7 @@ class DocumentActionServiceImplTest {
                 .thenReturn(mockDocument);
 
         // Act
-        String filename = documentActionService.resolveDownloadFilenameByShareToken(documentId, shareToken);
+        String filename = documentActionService.resolveDownloadFilenameByShareToken(documentId, shareToken, null);
 
         // Assert
         assertEquals("Test Document.pdf", filename);
