@@ -60,6 +60,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/ocr/**").permitAll()
                         .requestMatchers("/api/share/**").permitAll()
+                        .requestMatchers("/api/onlyoffice/callback").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/documents/*/download").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/admin/**").hasRole("ADMIN")

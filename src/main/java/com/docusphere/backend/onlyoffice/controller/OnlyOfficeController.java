@@ -103,7 +103,7 @@ public class OnlyOfficeController {
             // ONLYOFFICE recommendation: do not exceed 20 characters in old Community Editions. 
             // We can hash it if it's too long or use the timestamp hash to fit.
             int hash = docKey.hashCode();
-            docKey = documentId.toString().substring(0, 8) + "_" + Math.abs(hash);
+            docKey = "ds_" + documentId.toString().substring(0, 6) + "_" + Math.abs(hash);
         }
 
         String callbackToken = generateCallbackToken(documentId, requesterId);
