@@ -17,7 +17,6 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
-import jakarta.servlet.http.HttpServletRequest;
 
 import java.util.UUID;
 
@@ -138,7 +137,7 @@ public class DocumentActionController {
     @GetMapping("/{id}/download")
     public ResponseEntity<Resource> download(
             @PathVariable("id") UUID documentId,
-            HttpServletRequest request,
+            @RequestHeader(value = "Authorization", required = false) String token,
             @RequestParam(value = "token", required = false) String shareToken,
             @RequestParam(value = "password", required = false) String password
     ) {
@@ -149,7 +148,7 @@ public class DocumentActionController {
             resource = service.downloadByShareToken(documentId, shareToken, password);
             fileName = service.resolveDownloadFilenameByShareToken(documentId, shareToken, password);
         } else {
-            Long requesterId = extractRequesterId(request);
+            Long requesterId = extractRequesterId(token);
             resource = service.download(requesterId, documentId, password);
             fileName = service.resolveDownloadFilename(requesterId, documentId, password);
         }
@@ -160,28 +159,7 @@ public class DocumentActionController {
                 .body(resource);
     }
 
-    private Long extractRequesterId(HttpServletRequest request) {
-        String authHeader = request.getHeader("Authorization");
-        String token = null;
-        if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            token = authHeader.substring(7);
-        } else if (request.getCookies() != null) {
-            for (jakarta.servlet.http.Cookie c : request.getCookies()) {
-                if ("accessToken".equalsIgnoreCase(c.getName()) || "jwt".equalsIgnoreCase(c.getName()) || "Authorization".equalsIgnoreCase(c.getName())) {
-                    token = c.getValue();
-                    break;
-                }
-            }
-        }
-
-        if (token == null || token.isBlank()) {
-            throw new InvalidRequestException("Authorization header or accessToken cookie is required");
-        }
-
-        return jwtService.extractUserId(token);
-    }
-
-    private Long extractRequesterId(String token) {
+   private Long extractRequesterId(String token) {
         if (token == null || !token.startsWith("Bearer ")) {
             throw new InvalidRequestException("Authorization header with Bearer token is required");
         }

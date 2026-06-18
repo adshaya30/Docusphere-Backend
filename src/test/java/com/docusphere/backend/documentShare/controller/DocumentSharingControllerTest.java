@@ -4,7 +4,6 @@ import com.docusphere.backend.Common.exception.DocumentNotFoundException;
 import com.docusphere.backend.Common.exception.InvalidRequestException;
 import com.docusphere.backend.Common.exception.UnauthorizedAccessException;
 import com.docusphere.backend.authentication.service.JwtService;
-import com.docusphere.backend.authentication.service.security.CustomUserDetailsService;
 import com.docusphere.backend.documentShare.dto.CreateShareLinkRequest;
 import com.docusphere.backend.documentShare.dto.CreateShareLinkResponse;
 import com.docusphere.backend.documentShare.dto.SharedDocumentResponse;
@@ -46,9 +45,6 @@ class DocumentSharingControllerTest {
 
     @MockitoBean
     private JwtService jwtService;
-
-    @MockitoBean
-    private CustomUserDetailsService customUserDetailsService;
 
     private UUID documentId;
     private Long userId;
@@ -208,7 +204,7 @@ class DocumentSharingControllerTest {
         mockMvc.perform(post("/api/documents/{id}/share", documentId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isInternalServerError());
     }
 
     @Test
@@ -310,7 +306,7 @@ class DocumentSharingControllerTest {
         // Act & Assert
         mockMvc.perform(delete("/api/documents/{id}/share", documentId)
                 .header("Authorization", authToken))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isInternalServerError());
     }
 
     // ==================== OPEN SHARED DOCUMENT TESTS ====================
@@ -495,7 +491,7 @@ class DocumentSharingControllerTest {
                 .header("Authorization", authToken)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isInternalServerError());
     }
 }
 

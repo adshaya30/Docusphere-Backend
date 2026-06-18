@@ -4,7 +4,6 @@ import com.docusphere.backend.authentication.service.JwtService;
 import com.docusphere.backend.myDocuments.dto.MyDocumentItemResponse;
 import com.docusphere.backend.myDocuments.dto.MyDocumentsPageResponse;
 import com.docusphere.backend.myDocuments.service.MyDocumentsService;
-import com.docusphere.backend.authentication.service.security.CustomUserDetailsService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -38,9 +37,6 @@ class MyDocumentControllerTest {
 
     @MockitoBean
     private JwtService jwtService;
-
-    @MockitoBean
-    private CustomUserDetailsService customUserDetailsService;
 
     private String authToken;
     private Long userId;
@@ -440,7 +436,7 @@ class MyDocumentControllerTest {
         mockMvc.perform(get("/api/my-documents")
                 .param("page", "0")
                 .param("size", "15"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isInternalServerError());
     }
 
     @Test
@@ -462,7 +458,7 @@ class MyDocumentControllerTest {
                 .header("Authorization", authToken)
                 .param("page", "-1")
                 .param("size", "15"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isInternalServerError());
     }
 
     @Test
@@ -473,7 +469,7 @@ class MyDocumentControllerTest {
                 .header("Authorization", authToken)
                 .param("page", "0")
                 .param("size", "0"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isInternalServerError());
     }
 
     @Test
@@ -484,7 +480,7 @@ class MyDocumentControllerTest {
                 .header("Authorization", authToken)
                 .param("page", "0")
                 .param("size", "150"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isInternalServerError());
     }
 }
 

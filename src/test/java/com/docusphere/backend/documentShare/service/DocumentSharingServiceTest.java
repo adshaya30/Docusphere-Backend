@@ -385,7 +385,6 @@ class DocumentSharingServiceTest {
                 .token(shareToken)
                 .permission(DocumentSharePermission.EDIT)
                 .type(ShareLinkType.EMAIL_INVITE)
-                .email("editor@example.com")
                 .revoked(false)
                 .build();
 

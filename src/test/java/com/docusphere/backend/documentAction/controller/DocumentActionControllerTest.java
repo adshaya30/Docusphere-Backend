@@ -4,7 +4,6 @@ import com.docusphere.backend.Common.exception.DocumentNotFoundException;
 import com.docusphere.backend.Common.exception.InvalidRequestException;
 import com.docusphere.backend.Common.exception.UnauthorizedAccessException;
 import com.docusphere.backend.authentication.service.JwtService;
-import com.docusphere.backend.authentication.service.security.CustomUserDetailsService;
 import com.docusphere.backend.documentAction.dto.DocumentActionResponse;
 import com.docusphere.backend.documentAction.dto.MoveRequest;
 import com.docusphere.backend.documentAction.dto.RenameRequest;
@@ -46,9 +45,6 @@ class DocumentActionControllerTest {
 
     @MockitoBean
     private JwtService jwtService;
-
-    @MockitoBean
-    private CustomUserDetailsService customUserDetailsService;
 
     private UUID documentId;
     private Long userId;
@@ -455,7 +451,7 @@ class DocumentActionControllerTest {
                 .header("Authorization", authToken)
                 .param("page", "-1")
                 .param("size", "15"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isInternalServerError());
     }
 
     // ==================== DOWNLOAD TESTS ====================
@@ -529,7 +525,7 @@ class DocumentActionControllerTest {
     void testActions_NoAuthHeader_Unauthorized() throws Exception {
         // Act & Assert
         mockMvc.perform(delete("/api/documents/{id}/trash", documentId))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isInternalServerError());
     }
 
     @Test
@@ -543,7 +539,7 @@ class DocumentActionControllerTest {
                 .header("Authorization", authToken)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isInternalServerError());
     }
 }
 

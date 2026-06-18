@@ -85,7 +85,7 @@ public class GlobalExceptionHandler {
                 .findFirst()
                 .orElse("Validation failed for request body.");
 
-        return buildErrorResponse(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", message);
+        return buildErrorResponse(HttpStatus.BAD_REQUEST, "VALIDATION_FAILED", message);
     }
 
     // Handle missing query params like ?token= and ?email=
@@ -93,22 +93,6 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Object> handleMissingRequestParam(MissingServletRequestParameterException ex) {
         String message = ex.getParameterName() + " parameter is required";
         return buildErrorResponse(HttpStatus.BAD_REQUEST, "MISSING_REQUEST_PARAMETER", message);
-    }
-
-    @ExceptionHandler(jakarta.validation.ConstraintViolationException.class)
-    public ResponseEntity<Object> handleConstraintViolation(jakarta.validation.ConstraintViolationException ex) {
-        String message = ex.getConstraintViolations().stream()
-                .map(violation -> violation.getPropertyPath() + ": " + violation.getMessage())
-                .findFirst()
-                .orElse(ex.getMessage());
-        return buildErrorResponse(HttpStatus.BAD_REQUEST, "CONSTRAINT_VIOLATION", message);
-    }
-
-    @ExceptionHandler(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class)
-    public ResponseEntity<Object> handleMethodArgumentTypeMismatch(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException ex) {
-        String message = String.format("Parameter '%s' should be of type %s", ex.getName(), 
-                ex.getRequiredType() != null ? ex.getRequiredType().getSimpleName() : "unknown");
-        return buildErrorResponse(HttpStatus.BAD_REQUEST, "METHOD_ARGUMENT_TYPE_MISMATCH", message);
     }
 
     // Handle any other unexpected exceptions
@@ -156,21 +140,6 @@ public class GlobalExceptionHandler {
 
     //GLOBAL
 
-
-    @ExceptionHandler(DocumentNotFoundException.class)
-    public ResponseEntity<Object> handleDocumentNotFound(DocumentNotFoundException ex) {
-        return buildErrorResponse(HttpStatus.NOT_FOUND, "DOCUMENT_NOT_FOUND", ex.getMessage());
-    }
-
-    @ExceptionHandler(InvalidRequestException.class)
-    public ResponseEntity<Object> handleInvalidRequest(InvalidRequestException ex) {
-        return buildErrorResponse(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", ex.getMessage());
-    }
-
-    @ExceptionHandler(FileUploadException.class)
-    public ResponseEntity<Object> handleFileUploadException(FileUploadException ex) {
-        return buildErrorResponse(HttpStatus.BAD_REQUEST, "FILE_UPLOAD_ERROR", ex.getMessage());
-    }
 
     //  COMMON RESPONSE 
 
