@@ -8,6 +8,8 @@ import com.docusphere.backend.documentAction.dto.MoveRequest;
 import com.docusphere.backend.documentAction.dto.RenameRequest;
 import com.docusphere.backend.documentAction.dto.TrashDocumentsPageResponse;
 import com.docusphere.backend.documentAction.service.DocumentActionService;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -137,20 +139,22 @@ public class DocumentActionController {
     @GetMapping("/{id}/download")
     public ResponseEntity<Resource> download(
             @PathVariable("id") UUID documentId,
-            @RequestHeader(value = "Authorization", required = false) String token,
             @RequestParam(value = "token", required = false) String shareToken,
-            @RequestParam(value = "password", required = false) String password
+            @RequestParam(value = "password", required = false) String password,
+            @RequestHeader(value = "X-Document-Password", required = false) String passwordHeader,
+            HttpServletRequest request
     ) {
+        String effectivePassword = resolvePassword(password, passwordHeader);
         Resource resource;
         String fileName;
 
         if (shareToken != null && !shareToken.isBlank()) {
-            resource = service.downloadByShareToken(documentId, shareToken, password);
-            fileName = service.resolveDownloadFilenameByShareToken(documentId, shareToken, password);
+            resource = service.downloadByShareToken(documentId, shareToken, effectivePassword);
+            fileName = service.resolveDownloadFilenameByShareToken(documentId, shareToken, effectivePassword);
         } else {
-            Long requesterId = extractRequesterId(token);
-            resource = service.download(requesterId, documentId, password);
-            fileName = service.resolveDownloadFilename(requesterId, documentId, password);
+            Long requesterId = extractRequesterId(request);
+            resource = service.download(requesterId, documentId, effectivePassword);
+            fileName = service.resolveDownloadFilename(requesterId, documentId, effectivePassword);
         }
 
         return ResponseEntity.ok()
@@ -159,10 +163,42 @@ public class DocumentActionController {
                 .body(resource);
     }
 
-   private Long extractRequesterId(String token) {
-        if (token == null || !token.startsWith("Bearer ")) {
-            throw new InvalidRequestException("Authorization header with Bearer token is required");
+    private String resolvePassword(String password, String passwordHeader) {
+        if (password != null && !password.isBlank()) {
+            return password;
         }
-        return jwtService.extractUserId(token.substring(7));
+        if (passwordHeader != null && !passwordHeader.isBlank()) {
+            return passwordHeader;
+        }
+        return null;
+    }
+
+    private Long extractRequesterId(HttpServletRequest request) {
+        String token = resolveAccessToken(request);
+        if (token == null || token.isBlank()) {
+            throw new InvalidRequestException("Authorization header or accessToken cookie is required");
+        }
+        return jwtService.extractUserId(token);
+    }
+
+    private String resolveAccessToken(HttpServletRequest request) {
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            return authHeader.substring(7);
+        }
+
+        if (request.getCookies() == null) {
+            return null;
+        }
+
+        for (Cookie cookie : request.getCookies()) {
+            if ("accessToken".equalsIgnoreCase(cookie.getName())
+                    || "jwt".equalsIgnoreCase(cookie.getName())
+                    || "Authorization".equalsIgnoreCase(cookie.getName())) {
+                return cookie.getValue();
+            }
+        }
+
+        return null;
     }
 }
