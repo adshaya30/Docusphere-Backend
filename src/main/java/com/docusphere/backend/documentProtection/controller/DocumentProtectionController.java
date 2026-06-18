@@ -8,6 +8,7 @@ import com.docusphere.backend.documentProtection.dto.DocumentProtectionResponse;
 import com.docusphere.backend.documentProtection.dto.PasswordVerificationResponse;
 import com.docusphere.backend.documentProtection.dto.ResetDocumentPasswordRequest;
 import com.docusphere.backend.documentProtection.service.DocumentPasswordProtectionService;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -76,18 +77,12 @@ public class DocumentProtectionController {
     public ResponseEntity<ApiResponse<PasswordVerificationResponse>> verifyPassword(
             @PathVariable("id") UUID documentId,
             @Valid @RequestBody DocumentPasswordRequest request,
-            HttpServletRequest httpRequest,
-            @RequestParam(value = "token", required = false) String shareToken
+            @RequestParam(value = "token", required = false) String shareToken,
+            HttpServletRequest httpRequest
     ) {
-        Long requesterId = null;
-        try {
-            requesterId = extractRequesterId(httpRequest);
-        } catch (Exception ignored) {
-            // Optional if shareToken is present
-        }
-
+        Long requesterId = resolveOptionalRequesterId(httpRequest);
         if (requesterId == null && (shareToken == null || shareToken.isBlank())) {
-            throw new InvalidRequestException("Authorization or share token is required");
+            throw new InvalidRequestException("Authorization, accessToken cookie, or share token is required");
         }
 
         PasswordVerificationResponse response = protectionService.verifyPassword(
@@ -100,23 +95,39 @@ public class DocumentProtectionController {
     }
 
     private Long extractRequesterId(HttpServletRequest request) {
-        String authHeader = request.getHeader("Authorization");
-        String token = null;
-        if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            token = authHeader.substring(7);
-        } else if (request.getCookies() != null) {
-            for (jakarta.servlet.http.Cookie c : request.getCookies()) {
-                if ("accessToken".equalsIgnoreCase(c.getName()) || "jwt".equalsIgnoreCase(c.getName()) || "Authorization".equalsIgnoreCase(c.getName())) {
-                    token = c.getValue();
-                    break;
-                }
-            }
-        }
-
+        String token = resolveAccessToken(request);
         if (token == null || token.isBlank()) {
             throw new InvalidRequestException("Authorization header or accessToken cookie is required");
         }
-
         return jwtService.extractUserId(token);
+    }
+
+    private Long resolveOptionalRequesterId(HttpServletRequest request) {
+        String token = resolveAccessToken(request);
+        if (token == null || token.isBlank()) {
+            return null;
+        }
+        return jwtService.extractUserId(token);
+    }
+
+    private String resolveAccessToken(HttpServletRequest request) {
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            return authHeader.substring(7);
+        }
+
+        if (request.getCookies() == null) {
+            return null;
+        }
+
+        for (Cookie cookie : request.getCookies()) {
+            if ("accessToken".equalsIgnoreCase(cookie.getName())
+                    || "jwt".equalsIgnoreCase(cookie.getName())
+                    || "Authorization".equalsIgnoreCase(cookie.getName())) {
+                return cookie.getValue();
+            }
+        }
+
+        return null;
     }
 }
