@@ -43,8 +43,6 @@ public interface DocumentRepository extends JpaRepository<Document, UUID>,
 
     List<Document> findAllByTeamId(UUID teamId);
 
-
-
     boolean existsByOwnerIdAndUpdatedAtAfter(Long ownerId, LocalDateTime cutoff);
 
     // Update ALL documents that belong to oldTeamId and move them to newTeamId(MERGE TEAM : ADMIN)
@@ -54,5 +52,4 @@ public interface DocumentRepository extends JpaRepository<Document, UUID>,
 
     @Modifying
     void deleteByTeamId(UUID teamId);
-
-    }
+}

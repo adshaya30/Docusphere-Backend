@@ -1,0 +1,30 @@
+{
+  "properties": [
+    {
+      "name": "jwt.secret",
+      "type": "java.lang.String",
+      "description": "Base64 encoded secret key for JWT signing."
+    },
+    {
+      "name": "jwt.expiration",
+      "type": "java.lang.Long",
+      "description": "Expiration time for JWT tokens in milliseconds."
+    },
+    {
+      "name": "app.session.expiry",
+      "type": "java.lang.Long",
+      "description": "Default session expiration time in milliseconds."
+    },
+    {
+      "name": "app.session.remember-me-expiry",
+      "type": "java.lang.Long",
+      "description": "Remember-me session expiration time in milliseconds."
+    },
+    {
+      "name": "app.frontend-url",
+      "type": "java.lang.String",
+      "description": "Comma-separated list of allowed frontend URLs for CORS."
+    }
+
+  ]
+}
