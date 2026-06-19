@@ -31,7 +31,6 @@ class DocumentPasswordProtectionServiceTest {
     @Mock
     private TeamAccessValidator teamAccessValidator;
 
-
     private PasswordEncoder passwordEncoder;
     private DocumentPasswordVerificationStore verificationStore;
     private DocumentPasswordAccessGuard accessGuard;
@@ -49,8 +48,7 @@ class DocumentPasswordProtectionServiceTest {
                 documentRepository,
                 passwordEncoder,
                 accessGuard,
-                verificationStore,
-                passwordValidator
+                verificationStore
         );
 
         documentId = UUID.randomUUID();
