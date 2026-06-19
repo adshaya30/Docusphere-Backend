@@ -1,7 +1,9 @@
 package com.docusphere.backend.documentProtection.service;
 
 import com.docusphere.backend.Common.exception.InvalidPasswordException;
+import com.docusphere.backend.Common.exception.InvalidRequestException;
 import com.docusphere.backend.Common.exception.UnauthorizedAccessException;
+import com.docusphere.backend.Common.util.PasswordValidator;
 import com.docusphere.backend.document.entity.Document;
 import com.docusphere.backend.document.repository.DocumentRepository;
 import com.docusphere.backend.documentAction.service.TeamAccessValidator;
@@ -25,6 +27,9 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class DocumentPasswordProtectionServiceTest {
 
+    private static final String VALID_PASSWORD = "Secure1!";
+    private static final String DOCUMENT_PASSWORD = "secure123";
+
     @Mock
     private DocumentRepository documentRepository;
 
@@ -32,6 +37,7 @@ class DocumentPasswordProtectionServiceTest {
     private TeamAccessValidator teamAccessValidator;
 
     private PasswordEncoder passwordEncoder;
+    private PasswordValidator passwordValidator;
     private DocumentPasswordVerificationStore verificationStore;
     private DocumentPasswordAccessGuard accessGuard;
     private DocumentPasswordProtectionService service;
@@ -42,13 +48,15 @@ class DocumentPasswordProtectionServiceTest {
     @BeforeEach
     void setUp() {
         passwordEncoder = new BCryptPasswordEncoder();
+        passwordValidator = new PasswordValidator();
         verificationStore = new DocumentPasswordVerificationStore();
         accessGuard = new DocumentPasswordAccessGuard(passwordEncoder, verificationStore, teamAccessValidator);
         service = new DocumentPasswordProtectionService(
                 documentRepository,
                 passwordEncoder,
                 accessGuard,
-                verificationStore
+                verificationStore,
+                passwordValidator
         );
 
         documentId = UUID.randomUUID();
@@ -71,12 +79,19 @@ class DocumentPasswordProtectionServiceTest {
         when(documentRepository.findByIdAndDeletedFalse(documentId)).thenReturn(Optional.of(document));
         when(documentRepository.save(any(Document.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        DocumentProtectionResponse response = service.enableProtection(10L, documentId, "secure123");
+        DocumentProtectionResponse response = service.enableProtection(10L, documentId, VALID_PASSWORD);
 
         assertTrue(response.isPasswordProtected());
         assertNotNull(document.getPasswordHash());
-        assertFalse(document.getPasswordHash().contains("secure123"));
-        assertTrue(passwordEncoder.matches("secure123", document.getPasswordHash()));
+        assertFalse(document.getPasswordHash().contains(VALID_PASSWORD));
+        assertTrue(passwordEncoder.matches(VALID_PASSWORD, document.getPasswordHash()));
+    }
+
+    @Test
+    void enableProtection_shouldRejectWeakPassword() {
+        assertThrows(InvalidRequestException.class,
+                () -> service.enableProtection(10L, documentId, "weak"));
+        verify(documentRepository, never()).save(any(Document.class));
     }
 
     @Test
@@ -84,13 +99,13 @@ class DocumentPasswordProtectionServiceTest {
         when(documentRepository.findByIdAndDeletedFalse(documentId)).thenReturn(Optional.of(document));
 
         assertThrows(UnauthorizedAccessException.class,
-                () -> service.enableProtection(99L, documentId, "secure123"));
+                () -> service.enableProtection(99L, documentId, VALID_PASSWORD));
     }
 
     @Test
     void removeProtection_shouldClearHashAndFlag() {
         document.setPasswordProtected(true);
-        document.setPasswordHash(passwordEncoder.encode("secure123"));
+        document.setPasswordHash(passwordEncoder.encode(DOCUMENT_PASSWORD));
         when(documentRepository.findByIdAndDeletedFalse(documentId)).thenReturn(Optional.of(document));
         when(documentRepository.save(any(Document.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -102,12 +117,44 @@ class DocumentPasswordProtectionServiceTest {
     }
 
     @Test
-    void verifyPassword_shouldReturnVerifiedForOwner() {
+    void resetProtectionPassword_shouldUpdateHashAndKeepProtectionEnabled() {
         document.setPasswordProtected(true);
-        document.setPasswordHash(passwordEncoder.encode("secure123"));
+        document.setPasswordHash(passwordEncoder.encode(DOCUMENT_PASSWORD));
+        when(documentRepository.findByIdAndDeletedFalse(documentId)).thenReturn(Optional.of(document));
+        when(documentRepository.save(any(Document.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        DocumentProtectionResponse response = service.resetProtectionPassword(10L, documentId, VALID_PASSWORD);
+
+        assertTrue(response.isPasswordProtected());
+        assertTrue(passwordEncoder.matches(VALID_PASSWORD, document.getPasswordHash()));
+        assertFalse(passwordEncoder.matches(DOCUMENT_PASSWORD, document.getPasswordHash()));
+    }
+
+    @Test
+    void resetProtectionPassword_shouldRejectWeakPassword() {
+        assertThrows(InvalidRequestException.class,
+                () -> service.resetProtectionPassword(10L, documentId, "short"));
+        verify(documentRepository, never()).findByIdAndDeletedFalse(any());
+        verify(documentRepository, never()).save(any(Document.class));
+    }
+
+    @Test
+    void resetProtectionPassword_shouldRejectNonOwner() {
+        document.setPasswordProtected(true);
+        document.setPasswordHash(passwordEncoder.encode(DOCUMENT_PASSWORD));
         when(documentRepository.findByIdAndDeletedFalse(documentId)).thenReturn(Optional.of(document));
 
-        PasswordVerificationResponse response = service.verifyPassword(10L, documentId, "secure123", null);
+        assertThrows(UnauthorizedAccessException.class,
+                () -> service.resetProtectionPassword(99L, documentId, VALID_PASSWORD));
+    }
+
+    @Test
+    void verifyPassword_shouldReturnVerifiedForOwner() {
+        document.setPasswordProtected(true);
+        document.setPasswordHash(passwordEncoder.encode(DOCUMENT_PASSWORD));
+        when(documentRepository.findByIdAndDeletedFalse(documentId)).thenReturn(Optional.of(document));
+
+        PasswordVerificationResponse response = service.verifyPassword(10L, documentId, DOCUMENT_PASSWORD, null);
 
         assertTrue(response.isVerified());
         assertEquals(documentId, response.getDocumentId());
@@ -116,7 +163,7 @@ class DocumentPasswordProtectionServiceTest {
     @Test
     void verifyPassword_shouldRejectWrongPassword() {
         document.setPasswordProtected(true);
-        document.setPasswordHash(passwordEncoder.encode("secure123"));
+        document.setPasswordHash(passwordEncoder.encode(DOCUMENT_PASSWORD));
         when(documentRepository.findByIdAndDeletedFalse(documentId)).thenReturn(Optional.of(document));
 
         assertThrows(InvalidPasswordException.class,
@@ -126,10 +173,10 @@ class DocumentPasswordProtectionServiceTest {
     @Test
     void requirePasswordForContentAccess_shouldAllowAfterVerification() {
         document.setPasswordProtected(true);
-        document.setPasswordHash(passwordEncoder.encode("secure123"));
+        document.setPasswordHash(passwordEncoder.encode(DOCUMENT_PASSWORD));
         when(documentRepository.findByIdAndDeletedFalse(documentId)).thenReturn(Optional.of(document));
 
-        service.verifyPassword(10L, documentId, "secure123", null);
+        service.verifyPassword(10L, documentId, DOCUMENT_PASSWORD, null);
 
         assertDoesNotThrow(() ->
                 service.requirePasswordForContentAccess(document, null, 10L, null)
