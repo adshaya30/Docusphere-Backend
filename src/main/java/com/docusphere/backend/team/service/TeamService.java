@@ -1,7 +1,5 @@
 package com.docusphere.backend.team.service;
 
-
-
 import com.docusphere.backend.authentication.repository.UserRepository;
 import com.docusphere.backend.team.dto.TeamDto;
 import com.docusphere.backend.team.dto.TeamMemberDto;
@@ -43,7 +41,7 @@ public class TeamService {
         this.userActivityRepository = userActivityRepository;
     }
 
-    // ── Finders ─────────────────────────────────────────────────────────────
+    //Finders
 
     public Optional<Team> findTeamById(UUID teamId) {
         return teamRepository.findById(teamId);
@@ -70,7 +68,7 @@ public class TeamService {
                 .collect(Collectors.toList());
     }
 
-    // ── Membership checks ────────────────────────────────────────────────────
+    // Membership checks
 
     public boolean isUserInTeam(Long userId, UUID teamId) {
         return teamMemberRepository.existsByUserIdAndTeamId(userId, teamId);
@@ -94,13 +92,13 @@ public class TeamService {
         return teamMemberRepository.findLeaderByTeamId(teamId);
     }
 
-    // ── Count helpers ────────────────────────────────────────────────────────
+    //Count helpers
 
     public long countMembersByRole(UUID teamId, TeamRole role) {
         return teamMemberRepository.countByTeamIdAndRole(teamId, role);
     }
 
-    // ── Mappers ──────────────────────────────────────────────────────────────
+    //Mappers 
 
     public TeamDto toDto(Team team) {
         TeamDto dto = new TeamDto();
@@ -123,6 +121,7 @@ public class TeamService {
         dto.setTeamName(tm.getTeam().getTeamName());
         dto.setRole(tm.getRole() != null ? tm.getRole().name() : null);
         dto.setJoinedAt(tm.getJoinedAt());
+        dto.setActive(tm.getActive());
 
         // Enrich with email and fullName from UserRepository
         userRepository.findById(tm.getUserId()).ifPresent(user -> {

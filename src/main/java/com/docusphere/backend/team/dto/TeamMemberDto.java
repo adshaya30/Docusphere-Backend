@@ -15,6 +15,8 @@ public class TeamMemberDto {
     private String email;
     private String role;
     private LocalDateTime joinedAt;
+  /** When false, the member is blocked from team chat. */
+    private Boolean active;
 
     public TeamMemberDto() {}
 
@@ -41,4 +43,7 @@ public class TeamMemberDto {
 
     public LocalDateTime getJoinedAt() { return joinedAt; }
     public void setJoinedAt(LocalDateTime joinedAt) { this.joinedAt = joinedAt; }
+
+    public Boolean getActive() { return active; }
+    public void setActive(Boolean active) { this.active = active; }
 }
