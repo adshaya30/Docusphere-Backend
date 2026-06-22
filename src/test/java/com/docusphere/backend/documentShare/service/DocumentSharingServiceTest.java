@@ -51,6 +51,9 @@ class DocumentSharingServiceTest {
     @Mock
     private AppConfig appConfig;
 
+    @Mock
+    private com.docusphere.backend.team.service.TeamService teamService;
+
     @Captor
     private ArgumentCaptor<DocumentShare> documentShareCaptor;
 
@@ -70,6 +73,7 @@ class DocumentSharingServiceTest {
                 userRepository,
                 emailService,
                 appConfig,
+                teamService,
                 168L  // defaultShareExpiryHours (7 days)
         );
 

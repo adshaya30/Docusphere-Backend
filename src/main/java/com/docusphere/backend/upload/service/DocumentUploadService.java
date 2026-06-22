@@ -6,11 +6,13 @@ import com.docusphere.backend.document.entity.Document;
 import com.docusphere.backend.document.repository.DocumentRepository;
 import com.docusphere.backend.document.storage.FileStorageService;
 import com.docusphere.backend.documentAction.service.TeamAccessValidator;
+import com.docusphere.backend.team.repository.TeamRepository;
 import com.docusphere.backend.Common.exception.UnauthorizedAccessException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.nio.file.Files;
@@ -30,6 +32,7 @@ public class DocumentUploadService {
     private final DocumentRepository documentRepository;
     private final FileStorageService fileStorageService;
     private final TeamAccessValidator teamAccessValidator;
+    private final TeamRepository teamRepository;
 
     private final Path tempDir;
 
@@ -37,11 +40,13 @@ public class DocumentUploadService {
             DocumentRepository repository,
             FileStorageService fileStorageService,
             TeamAccessValidator teamAccessValidator,
+            TeamRepository teamRepository,
             @Value("${app.upload.dir:uploads}") String baseDir) throws Exception {
 
         this.documentRepository = repository;
         this.fileStorageService = fileStorageService;
         this.teamAccessValidator = teamAccessValidator;
+        this.teamRepository = teamRepository;
 
         Path uploadDir = Paths.get(baseDir).toAbsolutePath().normalize();
         this.tempDir = uploadDir.resolve(TEMP_FOLDER);
@@ -55,6 +60,7 @@ public class DocumentUploadService {
     }
 
     // ---------------- UPLOAD CHUNK ----------------
+    @Transactional
     public UploadResult uploadChunk(
             MultipartFile file,
             String fileName,
@@ -197,6 +203,9 @@ public class DocumentUploadService {
                     .build();
 
             Document saved = documentRepository.save(doc);
+            if (teamId != null) {
+                teamRepository.incrementDocumentCount(teamId);
+            }
             return UploadResult.completed(saved.getId().toString());
 
         } finally {

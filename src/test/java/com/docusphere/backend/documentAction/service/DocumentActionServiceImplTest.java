@@ -314,7 +314,7 @@ class DocumentActionServiceImplTest {
                 () -> documentActionService.duplicate(otherUserId, documentId)
         );
 
-        assertEquals("You do not have access to this document", exception.getMessage());
+        assertEquals("Only the owner can perform this action", exception.getMessage());
     }
 
     // ==================== MOVE TO TRASH TESTS ====================

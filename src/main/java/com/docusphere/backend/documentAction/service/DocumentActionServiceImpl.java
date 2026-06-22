@@ -13,6 +13,7 @@ import com.docusphere.backend.documentProtection.service.DocumentPasswordProtect
 import com.docusphere.backend.documentAction.dto.DocumentActionResponse;
 import com.docusphere.backend.documentAction.dto.TrashDocumentItemResponse;
 import com.docusphere.backend.documentAction.dto.TrashDocumentsPageResponse;
+import com.docusphere.backend.onlyoffice.service.DocumentEditPermissionService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
@@ -44,6 +45,7 @@ public class DocumentActionServiceImpl implements DocumentActionService {
     private final AuditService auditService;
     private final DocumentSharingService documentSharingService;
     private final DocumentPasswordProtectionService documentPasswordProtectionService;
+    private final DocumentEditPermissionService documentEditPermissionService;
     private final String supabaseUrl;
     private final String bucketName;
     private final RestTemplate restTemplate = new RestTemplate();
@@ -56,6 +58,7 @@ public class DocumentActionServiceImpl implements DocumentActionService {
             AuditService auditService,
             DocumentSharingService documentSharingService,
             DocumentPasswordProtectionService documentPasswordProtectionService,
+            DocumentEditPermissionService documentEditPermissionService,
             @Value("${supabase.url}") String supabaseUrl,
             @Value("${supabase.bucket.documents:documents}") String bucketName
     ) {
@@ -65,6 +68,7 @@ public class DocumentActionServiceImpl implements DocumentActionService {
         this.auditService = auditService;
         this.documentSharingService = documentSharingService;
         this.documentPasswordProtectionService = documentPasswordProtectionService;
+        this.documentEditPermissionService = documentEditPermissionService;
         this.supabaseUrl = supabaseUrl;
         this.bucketName = bucketName;
     }
@@ -87,7 +91,7 @@ public class DocumentActionServiceImpl implements DocumentActionService {
         }
 
         Document document = requireActiveDocument(documentId);
-        ensureOwner(document, requesterId);
+        ensureCanManage(document, requesterId);
         document.setName(newName.trim());
         return toResponse(documentRepository.save(document));
     }
@@ -96,7 +100,7 @@ public class DocumentActionServiceImpl implements DocumentActionService {
     @Transactional
     public DocumentActionResponse move(Long requesterId, UUID documentId, UUID targetTeamId) {
         Document document = requireActiveDocument(documentId);
-        ensureOwner(document, requesterId);
+        ensureCanManage(document, requesterId);
 
         if (targetTeamId != null && targetTeamId.equals(document.getTeamId())) {
             throw new InvalidRequestException("Document already in target space");
@@ -136,7 +140,7 @@ public class DocumentActionServiceImpl implements DocumentActionService {
     @Transactional
     public DocumentActionResponse duplicate(Long requesterId, UUID documentId) {
         Document original = requireActiveDocument(documentId);
-        ensureAccessible(original, requesterId);
+        ensureCanManage(original, requesterId);
 
         String duplicatedName = generateDuplicateName(original.getName(), requesterId, original.getTeamId());
         String duplicatedFileId = UUID.randomUUID().toString();
@@ -167,7 +171,7 @@ public class DocumentActionServiceImpl implements DocumentActionService {
     @Transactional
     public DocumentActionResponse moveToTrash(Long requesterId, UUID documentId) {
         Document document = requireActiveDocument(documentId);
-        ensureOwner(document, requesterId);
+        ensureCanManage(document, requesterId);
 
         document.setDeleted(true);
         document.setDeletedAt(LocalDateTime.now());
@@ -180,7 +184,7 @@ public class DocumentActionServiceImpl implements DocumentActionService {
         Document document = documentRepository.findById(documentId)
                 .orElseThrow(() -> new DocumentNotFoundException("Document not found"));
 
-        ensureOwner(document, requesterId);
+        ensureCanManage(document, requesterId);
 
         if (!document.isDeleted()) {
             throw new InvalidRequestException("Document is not in trash");
@@ -197,12 +201,15 @@ public class DocumentActionServiceImpl implements DocumentActionService {
         Document document = documentRepository.findById(documentId)
                 .orElseThrow(() -> new DocumentNotFoundException("Document not found"));
 
-        ensureOwner(document, requesterId);
+        ensureCanManage(document, requesterId);
 
         if (!document.isDeleted()) {
             throw new InvalidRequestException("Only trashed documents can be permanently deleted");
         }
 
+        if (documentSharingService != null) {
+            documentSharingService.deleteSharesByDocumentId(documentId);
+        }
         fileStorageService.deleteFile(document.getStorageKey());
         documentRepository.delete(document);
     }
@@ -285,6 +292,19 @@ public class DocumentActionServiceImpl implements DocumentActionService {
     private void ensureOwner(Document document, Long requesterId) {
         if (!document.getOwnerId().equals(requesterId)) {
             throw new UnauthorizedAccessException("Only the owner can perform this action");
+        }
+    }
+    private void ensureCanManage(Document document, Long requesterId) {
+        if (document.getTeamId() == null) {
+            ensureOwner(document, requesterId);
+            return;
+        }
+        if (documentEditPermissionService == null) {
+            ensureOwner(document, requesterId);
+            return;
+        }
+        if (!documentEditPermissionService.canEdit(document, requesterId)) {
+            throw new UnauthorizedAccessException("You do not have permission to manage this document");
         }
     }
 
