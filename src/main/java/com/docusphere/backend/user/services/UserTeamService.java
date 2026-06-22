@@ -31,6 +31,7 @@ import com.docusphere.backend.team.repository.TeamRepository;
 import com.docusphere.backend.team.repository.UserActivityRepository;
 import com.docusphere.backend.team.service.TeamService;
 import com.docusphere.backend.team.entity.UserActivity;
+import com.docusphere.backend.documentShare.repository.DocumentShareRepository;
 
 import jakarta.mail.MessagingException;
 import jakarta.persistence.EntityNotFoundException;
@@ -42,6 +43,8 @@ import jakarta.persistence.EntityNotFoundException;
  */
 @Service
 public class UserTeamService {
+    private static final String TEAM_INVITE_QUERY = "/?teamInvite=1";
+
 
     private final TeamRepository teamRepository;
     private final TeamMemberRepository teamMemberRepository;
@@ -54,6 +57,7 @@ public class UserTeamService {
     private final FileStorageService fileStorageService;
     private final UserActivityRepository userActivityRepository;
     private final DocumentStarRepository documentStarRepository;
+    private final DocumentShareRepository documentShareRepository;
     private final SimpMessagingTemplate messagingTemplate;
 
     public UserTeamService(TeamRepository teamRepository,
@@ -67,6 +71,7 @@ public class UserTeamService {
                            FileStorageService fileStorageService,
                            UserActivityRepository userActivityRepository,
                            DocumentStarRepository documentStarRepository,
+                           DocumentShareRepository documentShareRepository,
                            SimpMessagingTemplate messagingTemplate) {
         this.teamRepository = teamRepository;
         this.teamMemberRepository = teamMemberRepository;
@@ -79,6 +84,7 @@ public class UserTeamService {
         this.fileStorageService = fileStorageService;
         this.userActivityRepository = userActivityRepository;
         this.documentStarRepository = documentStarRepository;
+        this.documentShareRepository = documentShareRepository;
         this.messagingTemplate = messagingTemplate;
     }
 
@@ -162,6 +168,12 @@ public class UserTeamService {
 
         // 1. Cleanup document-related records
         List<Document> teamDocuments = documentRepository.findAllByTeamId(teamId);
+        List<UUID> docIds = teamDocuments.stream().map(Document::getId).toList();
+        if (!docIds.isEmpty()) {
+            documentStarRepository.deleteByDocumentIdIn(docIds);
+            documentShareRepository.deleteByDocumentIdIn(docIds);
+        }
+
         for (Document document : teamDocuments) {
         
             try {
@@ -249,7 +261,7 @@ public class UserTeamService {
 
                         // Send email
                         try {
-                            emailService.sendTeamInvitationEmail(email, team.getTeamName(), inviterName, appConfig.getFrontendUrl() + "/signup");
+                            emailService.sendTeamInvitationEmail(email, team.getTeamName(), inviterName, appConfig.getFrontendUrl() + TEAM_INVITE_QUERY);
                         } catch (MessagingException e) {
                             // Non-fatal, invitation is still saved
                         }

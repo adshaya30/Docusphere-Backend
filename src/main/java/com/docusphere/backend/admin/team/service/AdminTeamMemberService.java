@@ -23,6 +23,8 @@ import java.util.UUID;
 
 @Service
 public class AdminTeamMemberService {
+    private static final String TEAM_INVITE_QUERY = "/?teamInvite=1";
+
     private final TeamRepository teamRepository;
     private final TeamMemberRepository teamMemberRepository;
     private final TeamInvitationRepository teamInvitationRepository;
@@ -49,7 +51,7 @@ public class AdminTeamMemberService {
         return userRepository.findByEmail(email).map(u -> saveAndReturn(team, u.getId(), u.getFullName(), req.getRole())).orElseGet(() -> {
             TeamInvitation inv = new TeamInvitation(); inv.setEmail(email); inv.setTeamId(teamId); inv.setRole(TeamRole.valueOf(req.getRole()));
             teamInvitationRepository.save(inv);
-            try { emailService.sendTeamInvitationEmail(email, team.getTeamName(), "Admin", appConfig.getFrontendUrl() + "/signup"); } catch (Exception ignored) {}
+            try { emailService.sendTeamInvitationEmail(email, team.getTeamName(), "Admin", appConfig.getFrontendUrl() + TEAM_INVITE_QUERY); } catch (Exception ignored) {}
             return queryService.toAdminMemberViewFromInvitation(inv);
         });
     }

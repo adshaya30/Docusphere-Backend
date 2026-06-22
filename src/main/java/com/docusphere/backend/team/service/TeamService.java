@@ -1,6 +1,7 @@
 package com.docusphere.backend.team.service;
 
 import com.docusphere.backend.authentication.repository.UserRepository;
+import com.docusphere.backend.document.repository.DocumentRepository;
 import com.docusphere.backend.team.dto.TeamDto;
 import com.docusphere.backend.team.dto.TeamMemberDto;
 import com.docusphere.backend.team.dto.UserStatusDto;
@@ -28,15 +29,18 @@ public class TeamService {
 
     private final TeamRepository teamRepository;
     private final TeamMemberRepository teamMemberRepository;
+    private final DocumentRepository documentRepository;
     private final UserRepository userRepository;
     private final UserActivityRepository userActivityRepository;
 
     public TeamService(TeamRepository teamRepository,
                        TeamMemberRepository teamMemberRepository,
+                       DocumentRepository documentRepository,
                        UserRepository userRepository,
                        UserActivityRepository userActivityRepository) {
         this.teamRepository = teamRepository;
         this.teamMemberRepository = teamMemberRepository;
+        this.documentRepository = documentRepository;
         this.userRepository = userRepository;
         this.userActivityRepository = userActivityRepository;
     }
@@ -106,7 +110,7 @@ public class TeamService {
         dto.setName(team.getTeamName());
         dto.setDescription(team.getDescription());
         dto.setMemberCount((int) teamMemberRepository.countByTeamId(team.getId()));
-        dto.setDocumentCount(team.getDocumentCount());
+        dto.setDocumentCount((int) documentRepository.countByTeamIdAndDeletedFalse(team.getId()));
         dto.setCreatedAt(team.getCreatedAt());
         dto.setUpdatedAt(team.getUpdatedAt());
         return dto;

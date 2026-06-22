@@ -81,6 +81,7 @@ public class AdminTeamDocumentService {
         documentStarRepository.deleteByDocumentIdIn(List.of(documentId));
         documentShareRepository.deleteByDocumentIdIn(List.of(documentId));
         documentRepository.delete(doc);
+        teamRepository.decrementDocumentCount(teamId);
     }
 
 }
