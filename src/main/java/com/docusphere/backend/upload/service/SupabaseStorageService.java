@@ -40,8 +40,11 @@ public class SupabaseStorageService {
 
         String url = supabaseUrl + "/storage/v1/object/" + bucket + "/" + filePath;
 
+        String trimmedKey = (serviceKey != null) ? serviceKey.trim() : "";
+
         HttpHeaders headers = new HttpHeaders();
-        headers.set("Authorization", "Bearer " + serviceKey);
+        headers.set("Authorization", "Bearer " + trimmedKey);
+        headers.set("apikey", trimmedKey);
         headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
 
         FileSystemResource resource = new FileSystemResource(file);

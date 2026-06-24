@@ -33,7 +33,7 @@ public class SupabaseFileStorageService implements FileStorageService {
     @Override
     public String copyFile(String sourcePath, String targetPath) {
         byte[] sourceBytes = loadFile(sourcePath);
-        uploadBytes(sourceBytes, targetPath);
+        upsertBytes(sourceBytes, targetPath);
         return targetPath;
     }
 
@@ -122,15 +122,19 @@ public class SupabaseFileStorageService implements FileStorageService {
     // ------------------------ Helpers -----------------------------------
 
     private void uploadBytes(byte[] content, String targetPath) {
+        upsertBytes(content, targetPath);
+    }
+
+    private void upsertBytes(byte[] content, String targetPath) {
         String url = buildObjectUrl(targetPath);
         HttpHeaders headers = buildAuthHeaders();
         headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
-        headers.set("x-upsert", "false");
+        headers.set("x-upsert", "true");
         HttpEntity<byte[]> request = new HttpEntity<>(content, headers);
 
         ResponseEntity<String> response = restTemplate.exchange(
                 url,
-                HttpMethod.POST,
+                HttpMethod.PUT,
                 request,
                 String.class
         );
