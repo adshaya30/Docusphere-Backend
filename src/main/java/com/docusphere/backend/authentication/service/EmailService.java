@@ -59,7 +59,7 @@ public class EmailService {
     }
 
     // Send Team Invitation Email
-    public void sendTeamInvitationEmail(String to, String teamName, String inviterName) throws MessagingException {
+    public void sendTeamInvitationEmail(String to, String teamName, String inviterName, String link) throws MessagingException {
         MimeMessage message = mailSender.createMimeMessage();
         MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
@@ -72,6 +72,7 @@ public class EmailService {
         context.setVariable("userName", userName);
         context.setVariable("teamName", teamName);
         context.setVariable("inviterName", inviterName);
+        context.setVariable("link", link);
 
         String htmlContent = templateEngine.process("team-invitation-email", context);
 

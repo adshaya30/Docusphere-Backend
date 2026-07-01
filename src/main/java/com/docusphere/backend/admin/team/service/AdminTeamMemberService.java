@@ -1,6 +1,7 @@
 package com.docusphere.backend.admin.team.service;
 
 import com.docusphere.backend.admin.team.dto.AdminMemberView;
+import com.docusphere.backend.Common.config.AppConfig;
 import com.docusphere.backend.authentication.entity.User;
 import com.docusphere.backend.authentication.repository.UserRepository;
 import com.docusphere.backend.authentication.service.EmailService;
@@ -22,17 +23,20 @@ import java.util.UUID;
 
 @Service
 public class AdminTeamMemberService {
+    private static final String TEAM_INVITE_QUERY = "/?teamInvite=1";
+
     private final TeamRepository teamRepository;
     private final TeamMemberRepository teamMemberRepository;
     private final TeamInvitationRepository teamInvitationRepository;
     private final UserRepository userRepository;
     private final EmailService emailService;
+    private final AppConfig appConfig;
     private final AdminTeamQueryService queryService;
 
     public AdminTeamMemberService(TeamRepository tr, TeamMemberRepository tmr, TeamInvitationRepository tir, 
-                                  UserRepository ur, EmailService es, AdminTeamQueryService qs) {
+                                  UserRepository ur, EmailService es, AppConfig appConfig, AdminTeamQueryService qs) {
         this.teamRepository = tr; this.teamMemberRepository = tmr; this.teamInvitationRepository = tir;
-        this.userRepository = ur; this.emailService = es; this.queryService = qs;
+        this.userRepository = ur; this.emailService = es; this.appConfig = appConfig; this.queryService = qs;
     }
 
     @Transactional
@@ -47,7 +51,7 @@ public class AdminTeamMemberService {
         return userRepository.findByEmail(email).map(u -> saveAndReturn(team, u.getId(), u.getFullName(), req.getRole())).orElseGet(() -> {
             TeamInvitation inv = new TeamInvitation(); inv.setEmail(email); inv.setTeamId(teamId); inv.setRole(TeamRole.valueOf(req.getRole()));
             teamInvitationRepository.save(inv);
-            try { emailService.sendTeamInvitationEmail(email, team.getTeamName(), "Admin"); } catch (Exception ignored) {}
+            try { emailService.sendTeamInvitationEmail(email, team.getTeamName(), "Admin", appConfig.getFrontendUrl() + TEAM_INVITE_QUERY); } catch (Exception ignored) {}
             return queryService.toAdminMemberViewFromInvitation(inv);
         });
     }

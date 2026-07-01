@@ -43,6 +43,8 @@ public interface DocumentRepository extends JpaRepository<Document, UUID>,
 
     List<Document> findAllByTeamId(UUID teamId);
 
+    long countByTeamIdAndDeletedFalse(UUID teamId);
+
     boolean existsByOwnerIdAndUpdatedAtAfter(Long ownerId, LocalDateTime cutoff);
 
     // Update ALL documents that belong to oldTeamId and move them to newTeamId(MERGE TEAM : ADMIN)
