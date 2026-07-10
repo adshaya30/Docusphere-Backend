@@ -21,8 +21,10 @@ public class Comment {
     @Column(nullable = false)
     private UUID documentId;
 
-    @Column(nullable = false)
     private Long userId;
+
+    @Column(name = "author_email")
+    private String authorEmail;
 
     @Column(nullable = false, columnDefinition = "TEXT")
     private String message;

@@ -4,6 +4,7 @@ import com.docusphere.backend.Common.config.AppConfig;
 import com.docusphere.backend.Common.exception.DocumentNotFoundException;
 import com.docusphere.backend.Common.exception.InvalidRequestException;
 import com.docusphere.backend.Common.exception.UnauthorizedAccessException;
+import com.docusphere.backend.audit.service.AuditService;
 import com.docusphere.backend.authentication.entity.User;
 import com.docusphere.backend.authentication.repository.UserRepository;
 import com.docusphere.backend.authentication.service.EmailService;
@@ -25,7 +26,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Base64;
+import java.util.HashMap;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -36,6 +39,7 @@ public class DocumentSharingService {
     private final UserRepository userRepository;
     private final EmailService emailService;
     private final AppConfig appConfig;
+    private final AuditService auditService;
     private final TeamService teamService;
     private final long defaultShareExpiryHours;
     private final SecureRandom secureRandom = new SecureRandom();
@@ -46,6 +50,7 @@ public class DocumentSharingService {
             UserRepository userRepository,
             EmailService emailService,
             AppConfig appConfig,
+            AuditService auditService,
             TeamService teamService,
             @Value("${app.share.default-expiry-hours:168}") long defaultShareExpiryHours
     ) {
@@ -54,6 +59,7 @@ public class DocumentSharingService {
         this.userRepository = userRepository;
         this.emailService = emailService;
         this.appConfig = appConfig;
+        this.auditService = auditService;
         this.teamService = teamService;
         this.defaultShareExpiryHours = defaultShareExpiryHours;
     }
@@ -85,6 +91,12 @@ public class DocumentSharingService {
             emailService.sendDocumentShareEmail(normalizedEmail, document.getName(), ownerName, shareUrl);
         }
 
+        recordAudit("SHARE_LINK_CREATED", documentId, requesterId, Map.of(
+                "shareToken", saved.getToken(),
+                "permission", saved.getPermission().name(),
+                "type", saved.getType().name()
+        ));
+
         return CreateShareLinkResponse.builder()
                 .shareLinkId(saved.getId())
                 .token(saved.getToken())
@@ -100,17 +112,22 @@ public class DocumentSharingService {
     public SharedDocumentResponse openSharedDocument(String token) {
         DocumentShare share = requireValidShareToken(token);
         Document document = requireActiveDocument(share.getDocument().getId());
+
+        recordShareAction("SHARE_OPENED", share, document.getId());
+
         return SharedDocumentResponse.builder()
                 .documentId(document.getId())
                 .name(document.getName())
                 .type(document.getType())
                 .sizeBytes(document.getSizeBytes())
-                .fileUrl(document.getFileUrl())
+                .fileUrl(document.isPasswordProtected() ? null : document.getFileUrl())
                 .permission(share.getPermission())
                 .canView(share.getPermission().canView())
                 .canComment(share.getPermission().canComment())
                 .canEdit(share.getPermission().canEdit())
                 .passwordProtected(document.isPasswordProtected())
+                .invitedEmail(share.getEmail())
+                .expiresAt(share.getExpiresAt())
                 .build();
     }
 
@@ -126,6 +143,8 @@ public class DocumentSharingService {
         }
         share.setRevoked(true);
         documentShareRepository.save(share);
+
+        recordAudit("SHARE_LINK_REVOKED", documentId, requesterId, Map.of("shareToken", token));
     }
 
     @Transactional
@@ -139,37 +158,100 @@ public class DocumentSharingService {
         if (!share.getDocument().getId().equals(documentId)) {
             throw new UnauthorizedAccessException("Share token does not belong to this document");
         }
-        Document document = requireActiveDocument(documentId);
-        return document;
+        return requireActiveDocument(documentId);
+    }
+
+    @Transactional(readOnly = true)
+    public DocumentShare requireValidShareForDocument(UUID documentId, String token) {
+        DocumentShare share = requireValidShareToken(token);
+        if (!share.getDocument().getId().equals(documentId)) {
+            recordAudit("SHARE_TOKEN_DOCUMENT_MISMATCH", documentId, null, Map.of("shareToken", token));
+            throw new UnauthorizedAccessException("Share token does not belong to this document");
+        }
+        requireActiveDocument(documentId);
+        return share;
     }
 
     @Transactional(readOnly = true)
     public void requireCommentPermission(UUID documentId, String token) {
-        DocumentShare share = requireValidShareToken(token);
-        if (!share.getDocument().getId().equals(documentId)) {
-            throw new UnauthorizedAccessException("Share token does not belong to this document");
-        }
+        DocumentShare share = requireValidShareForDocument(documentId, token);
         if (!share.getPermission().canComment()) {
             throw new UnauthorizedAccessException("Comment permission is required");
         }
+    }
+
+    /**
+     * Validates share token, expiry, document existence, and EDIT permission.
+     * No login is required — the token binds document, invited email, and permission.
+     */
+    @Transactional(readOnly = true)
+    public DocumentShare requireEditPermission(UUID documentId, String token) {
+        DocumentShare share = requireValidShareForDocument(documentId, token);
+        if (!share.getPermission().canEdit()) {
+            recordShareAction("SHARE_EDIT_DENIED", share, documentId);
+            throw new UnauthorizedAccessException("Edit permission is required");
+        }
+        recordShareAction("SHARE_EDIT", share, documentId);
+        return share;
+    }
+
+    @Transactional(readOnly = true)
+    public void recordShareDownload(UUID documentId, String token) {
+        DocumentShare share = requireValidShareForDocument(documentId, token);
+        recordShareAction("SHARE_DOWNLOAD", share, documentId);
+    }
+
+    @Transactional(readOnly = true)
+    public void recordShareComment(UUID documentId, String token) {
+        DocumentShare share = requireValidShareForDocument(documentId, token);
+        if (!share.getPermission().canComment()) {
+            throw new UnauthorizedAccessException("Comment permission is required");
+        }
+        recordShareAction("SHARE_COMMENT", share, documentId);
+    }
+
+    @Transactional(readOnly = true)
+    public boolean hasEditPermissionViaShare(UUID documentId, String token) {
+        if (token == null || token.isBlank()) {
+            return false;
+        }
+        try {
+            DocumentShare share = requireValidShareForDocument(documentId, token);
+            return share.getPermission().canEdit();
+        } catch (RuntimeException ex) {
+            return false;
+        }
+    }
+
+    public String resolveInvitedEmail(DocumentShare share) {
+        return share != null ? share.getEmail() : null;
     }
 
     private DocumentShare requireValidShareToken(String token) {
         if (token == null || token.isBlank()) {
             throw new InvalidRequestException("share token is required");
         }
-        DocumentShare share = documentShareRepository.findByToken(token.trim())
-                .orElseThrow(() -> new DocumentNotFoundException("Share link not found"));
-        if (share.isRevoked()) {
-            throw new UnauthorizedAccessException("Share link was revoked");
+
+        try {
+            DocumentShare share = documentShareRepository.findByToken(token.trim())
+                    .orElseThrow(() -> new DocumentNotFoundException("Share link not found"));
+            if (share.isRevoked()) {
+                recordAudit("SHARE_INVITE_REVOKED", share.getDocument().getId(), null, Map.of("shareToken", token));
+                throw new UnauthorizedAccessException("Share link was revoked");
+            }
+            if (documentShareRepository.isExpired(share, LocalDateTime.now())) {
+                recordAudit("SHARE_INVITE_EXPIRED", share.getDocument().getId(), null, Map.of("shareToken", token));
+                throw new UnauthorizedAccessException("Share link expired");
+            }
+            if (share.getType() == ShareLinkType.EMAIL_INVITE && share.getEmail() == null) {
+                recordAudit("SHARE_INVITE_INVALID", share.getDocument().getId(), null, Map.of("shareToken", token));
+                throw new InvalidRequestException("Invalid invite share link");
+            }
+            return share;
+        } catch (DocumentNotFoundException ex) {
+            recordAudit("SHARE_INVITE_NOT_FOUND", null, null, Map.of("shareToken", token));
+            throw ex;
         }
-        if (documentShareRepository.isExpired(share, LocalDateTime.now())) {
-            throw new UnauthorizedAccessException("Share link expired");
-        }
-        if (share.getType() == ShareLinkType.EMAIL_INVITE && share.getEmail() == null) {
-            throw new InvalidRequestException("Invalid invite share link");
-        }
-        return share;
     }
 
     private void validateShareRequest(CreateShareLinkRequest request) {
@@ -219,19 +301,31 @@ public class DocumentSharingService {
         return email.trim().toLowerCase(Locale.ROOT);
     }
 
-    public void validateInviteEmailForUser(UUID documentId, String token, String loggedInEmail) {
-        DocumentShare share = requireValidShareToken(token);
-        if (!share.getDocument().getId().equals(documentId)) {
-            throw new UnauthorizedAccessException("Share token does not belong to this document");
+    private void recordShareAction(String action, DocumentShare share, UUID documentId) {
+        Map<String, Object> metadata = new HashMap<>();
+        metadata.put("documentId", documentId.toString());
+        metadata.put("timestamp", LocalDateTime.now().toString());
+        metadata.put("permission", share.getPermission().name());
+        if (share.getEmail() != null) {
+            metadata.put("invitedEmail", share.getEmail());
         }
-        if (share.getType() == ShareLinkType.EMAIL_INVITE) {
-            if (loggedInEmail == null || loggedInEmail.isBlank()) {
-                throw new UnauthorizedAccessException("Sign in with invited email to continue");
-            }
-            if (!normalizeEmail(loggedInEmail).equals(normalizeEmail(share.getEmail()))) {
-                throw new UnauthorizedAccessException("Signed-in account does not match invited email");
-            }
+        if (share.getToken() != null) {
+            metadata.put("shareToken", share.getToken());
         }
+        auditService.record(action, metadata);
+    }
+
+    private void recordAudit(String action, UUID documentId, Long userId, Map<String, Object> extra) {
+        Map<String, Object> metadata = new HashMap<>();
+        if (documentId != null) {
+            metadata.put("documentId", documentId.toString());
+        }
+        if (userId != null) {
+            metadata.put("userId", userId);
+        }
+        metadata.put("timestamp", LocalDateTime.now().toString());
+        metadata.putAll(extra);
+        auditService.record(action, metadata);
     }
 
     private Document requireActiveDocument(UUID documentId) {

@@ -3,6 +3,7 @@ package com.docusphere.backend.documentProtection.service;
 import com.docusphere.backend.Common.exception.InvalidPasswordException;
 import com.docusphere.backend.Common.exception.InvalidRequestException;
 import com.docusphere.backend.Common.exception.UnauthorizedAccessException;
+import com.docusphere.backend.audit.service.AuditService;
 import com.docusphere.backend.Common.util.PasswordValidator;
 import com.docusphere.backend.document.entity.Document;
 import com.docusphere.backend.document.repository.DocumentRepository;
@@ -36,6 +37,9 @@ class DocumentPasswordProtectionServiceTest {
     @Mock
     private TeamAccessValidator teamAccessValidator;
 
+    @Mock
+    private AuditService auditService;
+
     private PasswordEncoder passwordEncoder;
     private PasswordValidator passwordValidator;
     private DocumentPasswordVerificationStore verificationStore;
@@ -56,7 +60,8 @@ class DocumentPasswordProtectionServiceTest {
                 passwordEncoder,
                 accessGuard,
                 verificationStore,
-                passwordValidator
+                passwordValidator,
+                auditService
         );
 
         documentId = UUID.randomUUID();

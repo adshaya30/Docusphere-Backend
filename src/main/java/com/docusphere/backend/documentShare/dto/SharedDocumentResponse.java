@@ -19,4 +19,6 @@ public class SharedDocumentResponse {
     private boolean canComment;
     private boolean canEdit;
     private boolean passwordProtected;
+    private String invitedEmail;
+    private java.time.LocalDateTime expiresAt;
 }
