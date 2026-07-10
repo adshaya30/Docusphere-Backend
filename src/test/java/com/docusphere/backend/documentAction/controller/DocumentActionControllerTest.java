@@ -29,11 +29,8 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-import org.springframework.test.context.TestPropertySource;
-
 @WebMvcTest(controllers = DocumentActionController.class)
 @AutoConfigureMockMvc(addFilters = false)
-@TestPropertySource(properties = "app.onlyoffice.jwt.secret=V8pX9iu5gDWzQrHP5Od62XOOiuOnlrtF")
 @DisplayName("DocumentActionController Unit Tests")
 class DocumentActionControllerTest {
 
@@ -48,9 +45,6 @@ class DocumentActionControllerTest {
 
     @MockitoBean
     private JwtService jwtService;
-
-    @MockitoBean
-    private org.springframework.security.core.userdetails.UserDetailsService userDetailsService;
 
     private UUID documentId;
     private Long userId;

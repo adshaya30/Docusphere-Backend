@@ -236,13 +236,6 @@ public class DocumentActionServiceImpl implements DocumentActionService {
 
     @Override
     @Transactional(readOnly = true)
-    public Resource downloadForSystem(UUID documentId) {
-        Document document = requireActiveDocument(documentId);
-        return new ByteArrayResource(loadDocumentBytes(document));
-    }
-
-    @Override
-    @Transactional(readOnly = true)
     public String resolveDownloadFilename(Long requesterId, UUID documentId, String password) {
         Document document = requireActiveDocument(documentId);
         ensureAccessible(document, requesterId);

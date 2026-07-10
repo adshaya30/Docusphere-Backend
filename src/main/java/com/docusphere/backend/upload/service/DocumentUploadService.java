@@ -139,9 +139,9 @@ public class DocumentUploadService {
 
         if (!Files.exists(chunkPath)) {
             try (java.io.OutputStream out = java.nio.file.Files.newOutputStream(
-                    chunkPath,
-                    java.nio.file.StandardOpenOption.CREATE,
-                    java.nio.file.StandardOpenOption.WRITE,
+                    chunkPath, 
+                    java.nio.file.StandardOpenOption.CREATE, 
+                    java.nio.file.StandardOpenOption.WRITE, 
                     java.nio.file.StandardOpenOption.TRUNCATE_EXISTING)) {
                 file.getInputStream().transferTo(out);
             }
@@ -168,7 +168,7 @@ public class DocumentUploadService {
             }
 
             String safeName = sanitize(fileName);
-            String storageKey = fileId + "_" + safeName;
+            String storageKey = "Documents/" + fileId + "_" + safeName;
 
             java.io.File mergedFile = mergeChunks(sessionDir, totalChunks, fileId);
 
@@ -209,8 +209,8 @@ public class DocumentUploadService {
         Path mergedFile = dir.resolve(fileId + "_merged");
 
         try (java.io.OutputStream out = java.nio.file.Files.newOutputStream(
-                mergedFile,
-                java.nio.file.StandardOpenOption.CREATE,
+                mergedFile, 
+                java.nio.file.StandardOpenOption.CREATE, 
                 java.nio.file.StandardOpenOption.WRITE)) {
             for (int i = 0; i < total; i++) {
                 java.nio.file.Files.copy(dir.resolve(CHUNK_PREFIX + i), out);

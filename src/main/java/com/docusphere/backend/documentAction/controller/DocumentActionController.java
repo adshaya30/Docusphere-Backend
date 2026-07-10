@@ -30,9 +30,6 @@ public class DocumentActionController {
     private final DocumentActionService service;
     private final JwtService jwtService;
 
-    @org.springframework.beans.factory.annotation.Value("${app.onlyoffice.jwt.secret:V8pX9iu5gDWzQrHP5Od62XOOiuOnlrtF}")
-    private String onlyofficeJwtSecret;
-
     public DocumentActionController(DocumentActionService service, JwtService jwtService) {
         this.service = service;
         this.jwtService = jwtService;
@@ -139,12 +136,26 @@ public class DocumentActionController {
         );
     }
 
-    @GetMapping("/{documentId}/download")
+    @GetMapping("/{id}/download")
     public ResponseEntity<Resource> download(
-            @PathVariable UUID documentId
+            @PathVariable("id") UUID documentId,
+            @RequestParam(value = "token", required = false) String shareToken,
+            @RequestParam(value = "password", required = false) String password,
+            @RequestHeader(value = "X-Document-Password", required = false) String passwordHeader,
+            HttpServletRequest request
     ) {
-        Resource resource = service.downloadForSystem(documentId);
-        String fileName = documentId.toString() + ".docx";
+        String effectivePassword = resolvePassword(password, passwordHeader);
+        Resource resource;
+        String fileName;
+
+        if (shareToken != null && !shareToken.isBlank()) {
+            resource = service.downloadByShareToken(documentId, shareToken, effectivePassword);
+            fileName = service.resolveDownloadFilenameByShareToken(documentId, shareToken, effectivePassword);
+        } else {
+            Long requesterId = extractRequesterId(request);
+            resource = service.download(requesterId, documentId, effectivePassword);
+            fileName = service.resolveDownloadFilename(requesterId, documentId, effectivePassword);
+        }
 
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
@@ -189,22 +200,5 @@ public class DocumentActionController {
         }
 
         return null;
-    }
-
-    private boolean isOnlyOfficeRequest(HttpServletRequest request) {
-        String authHeader = request.getHeader("Authorization");
-        if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            String token = authHeader.substring(7);
-            try {
-                io.jsonwebtoken.Jwts.parser()
-                        .verifyWith(io.jsonwebtoken.security.Keys.hmacShaKeyFor(onlyofficeJwtSecret.getBytes(java.nio.charset.StandardCharsets.UTF_8)))
-                        .build()
-                        .parseSignedClaims(token);
-                return true;
-            } catch (Exception e) {
-                return false;
-            }
-        }
-        return false;
     }
 }
