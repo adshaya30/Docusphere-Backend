@@ -95,10 +95,7 @@ public class DocumentPasswordProtectionService {
             throw new InvalidPasswordException("Incorrect document password");
         }
 
-        String principalKey = requesterId != null
-                ? "user:" + requesterId
-                : "share:" + (shareToken != null ? shareToken.trim() : "");
-        verificationStore.markVerified(documentId, principalKey);
+        accessGuard.markVerifiedAccess(documentId, requesterId, shareToken);
         recordPasswordAudit("PASSWORD_PROTECTED_ACCESS_GRANTED", documentId, requesterId, shareToken);
 
         return PasswordVerificationResponse.builder()

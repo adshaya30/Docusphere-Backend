@@ -45,6 +45,9 @@ class DocumentSharingServiceSecurityTest {
     @Mock
     private AuditService auditService;
 
+    @Mock
+    private com.docusphere.backend.team.service.TeamService teamService;
+
     private DocumentSharingService documentSharingService;
 
     private UUID documentId;
@@ -61,6 +64,7 @@ class DocumentSharingServiceSecurityTest {
                 emailService,
                 appConfig,
                 auditService,
+                teamService,
                 168L
         );
 

@@ -54,6 +54,8 @@ class DocumentSharingServiceTest {
 
     @Mock
     private AuditService auditService;
+
+    @Mock
     private com.docusphere.backend.team.service.TeamService teamService;
 
     @Captor
@@ -76,7 +78,6 @@ class DocumentSharingServiceTest {
                 emailService,
                 appConfig,
                 auditService,
-                168L
                 teamService,
                 168L  // defaultShareExpiryHours (7 days)
         );
@@ -296,7 +297,7 @@ class DocumentSharingServiceTest {
                 () -> documentSharingService.createShareLink(requesterId, documentId, request)
         );
 
-        assertEquals("Only the owner can perform this action", exception.getMessage());
+        assertEquals("You do not have permission to share this document", exception.getMessage());
     }
 
     @Test
