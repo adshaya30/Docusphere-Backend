@@ -17,6 +17,8 @@ import com.docusphere.backend.documentShare.entity.DocumentShare;
 import com.docusphere.backend.documentShare.entity.DocumentSharePermission;
 import com.docusphere.backend.documentShare.entity.ShareLinkType;
 import com.docusphere.backend.documentShare.repository.DocumentShareRepository;
+import com.docusphere.backend.team.entity.TeamRole;
+import com.docusphere.backend.team.service.TeamService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,6 +40,7 @@ public class DocumentSharingService {
     private final EmailService emailService;
     private final AppConfig appConfig;
     private final AuditService auditService;
+    private final TeamService teamService;
     private final long defaultShareExpiryHours;
     private final SecureRandom secureRandom = new SecureRandom();
 
@@ -48,6 +51,7 @@ public class DocumentSharingService {
             EmailService emailService,
             AppConfig appConfig,
             AuditService auditService,
+            TeamService teamService,
             @Value("${app.share.default-expiry-hours:168}") long defaultShareExpiryHours
     ) {
         this.documentRepository = documentRepository;
@@ -56,13 +60,14 @@ public class DocumentSharingService {
         this.emailService = emailService;
         this.appConfig = appConfig;
         this.auditService = auditService;
+        this.teamService = teamService;
         this.defaultShareExpiryHours = defaultShareExpiryHours;
     }
 
     @Transactional
     public CreateShareLinkResponse createShareLink(Long requesterId, UUID documentId, CreateShareLinkRequest request) {
         Document document = requireActiveDocument(documentId);
-        ensureOwner(document, requesterId);
+        ensureCanShare(document, requesterId);
         validateShareRequest(request);
         String normalizedEmail = normalizeOptionalEmail(request.getEmail());
         LocalDateTime now = LocalDateTime.now();
@@ -129,7 +134,7 @@ public class DocumentSharingService {
     @Transactional
     public void revokeShareLink(Long requesterId, UUID documentId, String token) {
         Document document = requireActiveDocument(documentId);
-        ensureOwner(document, requesterId);
+        ensureCanShare(document, requesterId);
         DocumentShare share = documentShareRepository
                 .findByToken(token)
                 .orElseThrow(() -> new DocumentNotFoundException("Share link not found"));
@@ -326,6 +331,27 @@ public class DocumentSharingService {
     private Document requireActiveDocument(UUID documentId) {
         return documentRepository.findByIdAndDeletedFalse(documentId)
                 .orElseThrow(() -> new DocumentNotFoundException("Document not found"));
+    }
+
+    private void ensureCanShare(Document document, Long requesterId) {
+        if (requesterId == null) {
+            throw new UnauthorizedAccessException("Only the owner can perform this action");
+        }
+
+        if (document.getOwnerId() != null && document.getOwnerId().equals(requesterId)) {
+            return;
+        }
+
+        UUID teamId = document.getTeamId();
+        if (teamId != null) {
+            boolean isPrivileged = teamService.isUserRoleInTeam(requesterId, teamId, TeamRole.LEADER)
+                    || teamService.isUserRoleInTeam(requesterId, teamId, TeamRole.MANAGER);
+            if (isPrivileged) {
+                return;
+            }
+        }
+
+        throw new UnauthorizedAccessException("You do not have permission to share this document");
     }
 
     private void ensureOwner(Document document, Long requesterId) {

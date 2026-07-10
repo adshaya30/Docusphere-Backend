@@ -571,5 +571,3 @@ class DocumentActionServiceImplTest {
         verify(documentSharingService, times(1)).checkReadAccessByShareToken(documentId, shareToken);
     }
 }
-
-

@@ -32,8 +32,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         return path == null
                 || path.startsWith("/oauth2/")
                 || path.startsWith("/login/")
-                || path.startsWith("/login/oauth2/code/")
-                || path.equals("/api/auth/oauth2/login");
+                || path.startsWith("/api/auth/oauth2/callback/")
+                || path.equals("/api/auth/oauth2/login")
+                || path.startsWith("/api/onlyoffice/callback");
     }
 
     @Override

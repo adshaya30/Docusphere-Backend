@@ -54,6 +54,7 @@ class DocumentSharingServiceTest {
 
     @Mock
     private AuditService auditService;
+    private com.docusphere.backend.team.service.TeamService teamService;
 
     @Captor
     private ArgumentCaptor<DocumentShare> documentShareCaptor;
@@ -76,6 +77,8 @@ class DocumentSharingServiceTest {
                 appConfig,
                 auditService,
                 168L
+                teamService,
+                168L  // defaultShareExpiryHours (7 days)
         );
 
         documentId = UUID.randomUUID();

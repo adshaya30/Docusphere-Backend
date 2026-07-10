@@ -2,6 +2,9 @@ package com.docusphere.backend.user.services;
 
 import java.util.List;
 import java.util.UUID;
+import java.time.LocalDateTime;
+import java.util.Map;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -9,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.docusphere.backend.authentication.entity.User;
 import com.docusphere.backend.authentication.repository.UserRepository;
 import com.docusphere.backend.authentication.service.EmailService;
+import com.docusphere.backend.Common.config.AppConfig;
 import com.docusphere.backend.document.entity.Document;
 import com.docusphere.backend.document.repository.DocumentRepository;
 import com.docusphere.backend.document.storage.FileStorageService;
@@ -16,6 +20,7 @@ import com.docusphere.backend.documentStar.repository.DocumentStarRepository;
 import com.docusphere.backend.team.dto.AddMemberRequest;
 import com.docusphere.backend.team.dto.TeamDto;
 import com.docusphere.backend.team.dto.TeamMemberDto;
+import com.docusphere.backend.team.dto.TransferLeaderRequest;
 import com.docusphere.backend.team.entity.Team;
 import com.docusphere.backend.team.entity.TeamInvitation;
 import com.docusphere.backend.team.entity.TeamMember;
@@ -25,17 +30,21 @@ import com.docusphere.backend.team.repository.TeamMemberRepository;
 import com.docusphere.backend.team.repository.TeamRepository;
 import com.docusphere.backend.team.repository.UserActivityRepository;
 import com.docusphere.backend.team.service.TeamService;
+import com.docusphere.backend.team.entity.UserActivity;
+import com.docusphere.backend.documentShare.repository.DocumentShareRepository;
 
 import jakarta.mail.MessagingException;
 import jakarta.persistence.EntityNotFoundException;
 
 /**
- * Partner's service for leader/member/manager operations.
+ * service for leader/member/manager operations.
  * Delegates to shared TeamService for queries.
  * Owns: create team, delete team, add member (by leader).
  */
 @Service
 public class UserTeamService {
+    private static final String TEAM_INVITE_QUERY = "/?teamInvite=1";
+
 
     private final TeamRepository teamRepository;
     private final TeamMemberRepository teamMemberRepository;
@@ -43,10 +52,13 @@ public class UserTeamService {
     private final TeamService teamService;
     private final UserRepository userRepository;
     private final EmailService emailService;
+    private final AppConfig appConfig;
     private final DocumentRepository documentRepository;
     private final FileStorageService fileStorageService;
     private final UserActivityRepository userActivityRepository;
     private final DocumentStarRepository documentStarRepository;
+    private final DocumentShareRepository documentShareRepository;
+    private final SimpMessagingTemplate messagingTemplate;
 
     public UserTeamService(TeamRepository teamRepository,
                            TeamMemberRepository teamMemberRepository,
@@ -54,20 +66,26 @@ public class UserTeamService {
                            TeamService teamService,
                            UserRepository userRepository,
                            EmailService emailService,
+                           AppConfig appConfig,
                            DocumentRepository documentRepository,
                            FileStorageService fileStorageService,
                            UserActivityRepository userActivityRepository,
-                           DocumentStarRepository documentStarRepository) {
+                           DocumentStarRepository documentStarRepository,
+                           DocumentShareRepository documentShareRepository,
+                           SimpMessagingTemplate messagingTemplate) {
         this.teamRepository = teamRepository;
         this.teamMemberRepository = teamMemberRepository;
         this.teamInvitationRepository = teamInvitationRepository;
         this.teamService = teamService;
         this.userRepository = userRepository;
         this.emailService = emailService;
+        this.appConfig = appConfig;
         this.documentRepository = documentRepository;
         this.fileStorageService = fileStorageService;
         this.userActivityRepository = userActivityRepository;
         this.documentStarRepository = documentStarRepository;
+        this.documentShareRepository = documentShareRepository;
+        this.messagingTemplate = messagingTemplate;
     }
 
     /**
@@ -109,6 +127,36 @@ public class UserTeamService {
         return teamService.toDto(savedTeam);
     }
 
+    @Transactional
+    public void touchMemberLastSeen(UUID teamId, Long userId) {
+        if (!teamService.isUserInTeam(userId, teamId)) {
+            return;
+        }
+
+        teamMemberRepository.findByUserIdAndTeamId(userId, teamId).ifPresent(member -> {
+            member.setLastSeen(LocalDateTime.now());
+            teamMemberRepository.save(member);
+        });
+    }
+
+    @Transactional
+    public void recordTeamPageAccess(UUID teamId, Long userId) {
+        if (!teamService.isUserInTeam(userId, teamId)) {
+            return;
+        }
+
+        teamMemberRepository.findByUserIdAndTeamId(userId, teamId).ifPresent(member -> {
+            member.setLastSeen(LocalDateTime.now());
+            teamMemberRepository.save(member);
+        });
+
+        UserActivity activity = new UserActivity();
+        activity.setUserId(userId);
+        activity.setTeamId(teamId);
+        activity.setActivityType("TEAM_PAGE_VIEW");
+        userActivityRepository.save(activity);
+    }
+
     /**
      * Leader deletes a team — removes team + all memberships (cascade).
      */
@@ -120,6 +168,12 @@ public class UserTeamService {
 
         // 1. Cleanup document-related records
         List<Document> teamDocuments = documentRepository.findAllByTeamId(teamId);
+        List<UUID> docIds = teamDocuments.stream().map(Document::getId).toList();
+        if (!docIds.isEmpty()) {
+            documentStarRepository.deleteByDocumentIdIn(docIds);
+            documentShareRepository.deleteByDocumentIdIn(docIds);
+        }
+
         for (Document document : teamDocuments) {
         
             try {
@@ -207,7 +261,7 @@ public class UserTeamService {
 
                         // Send email
                         try {
-                            emailService.sendTeamInvitationEmail(email, team.getTeamName(), inviterName);
+                            emailService.sendTeamInvitationEmail(email, team.getTeamName(), inviterName, appConfig.getFrontendUrl() + TEAM_INVITE_QUERY);
                         } catch (MessagingException e) {
                             // Non-fatal, invitation is still saved
                         }
@@ -284,5 +338,64 @@ public class UserTeamService {
 
         membership.setRole(role);
         teamMemberRepository.save(membership);
+    }
+
+    @Transactional
+    public void transferLeader(UUID teamId, TransferLeaderRequest request, Long requesterId) {
+        if (!teamService.isUserRoleInTeam(requesterId, teamId, TeamRole.LEADER)) {
+            throw new IllegalStateException("Only the LEADER can transfer leadership");
+        }
+
+        if (request.getNewLeaderId() == null) {
+            throw new IllegalArgumentException("newLeaderId is required");
+        }
+
+        TeamMember currentLeader = teamMemberRepository.findLeaderByTeamId(teamId)
+                .orElseThrow(() -> new EntityNotFoundException("No leader found for this team"));
+
+        if (!currentLeader.getUserId().equals(requesterId)) {
+            throw new IllegalStateException("Only the current LEADER can transfer leadership");
+        }
+
+        TeamMember nextLeader = teamMemberRepository.findByUserIdAndTeamId(request.getNewLeaderId(), teamId)
+                .orElseThrow(() -> new EntityNotFoundException("Target member must be an existing team member"));
+
+        if (nextLeader.getRole() == TeamRole.LEADER) {
+            throw new IllegalStateException("Target member is already the leader");
+        }
+
+        currentLeader.setRole(TeamRole.MEMBER);
+        nextLeader.setRole(TeamRole.LEADER);
+        teamMemberRepository.save(currentLeader);
+        teamMemberRepository.save(nextLeader);
+    }
+
+    @Transactional
+    public void setMemberChatAccess(UUID teamId, Long memberUserId, boolean blocked, Long requesterId) {
+        if (!teamService.isUserRoleInTeam(requesterId, teamId, TeamRole.LEADER)) {
+            throw new IllegalStateException("Only the LEADER can manage chat access");
+        }
+
+        TeamMember membership = teamMemberRepository.findByUserIdAndTeamId(memberUserId, teamId)
+                .orElseThrow(() -> new EntityNotFoundException("Member not found in team"));
+
+        if (membership.getRole() == TeamRole.LEADER) {
+            throw new IllegalStateException("Cannot block the LEADER");
+        }
+
+        membership.setActive(!blocked);
+        teamMemberRepository.save(membership);
+
+        try {
+            Map<String, Object> payload = Map.of(
+                "type", "CHAT_BLOCK_UPDATE",
+                "userId", memberUserId,
+                "blocked", blocked,
+                "teamId", teamId.toString()
+            );
+            messagingTemplate.convertAndSend("/topic/teams/" + teamId + "/chat", payload);
+        } catch (Exception e) {
+            // Keep going if WS fails
+        }
     }
 }

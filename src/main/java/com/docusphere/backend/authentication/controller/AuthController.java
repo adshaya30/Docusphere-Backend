@@ -25,6 +25,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
+import java.net.URI;
 import java.time.Duration;
 
 @RestController
@@ -145,6 +146,16 @@ public class AuthController {
         );
     }
 
+    @GetMapping("/google")
+    public ResponseEntity<Void> redirectToGoogle() {
+        return redirectToOAuth2Provider("google");
+    }
+
+    @GetMapping("/github")
+    public ResponseEntity<Void> redirectToGithub() {
+        return redirectToOAuth2Provider("github");
+    }
+
     @PostMapping("/refresh")
     public ResponseEntity<AuthResponse> refresh(@CookieValue(name = REFRESH_TOKEN_COOKIE, required = false) String refreshToken) {
         if (refreshToken == null || refreshToken.isBlank()) {
@@ -251,14 +262,27 @@ public class AuthController {
         userService.changePassword(userDetails.getUsername(), request);
         return ResponseEntity.ok(new MessageResponse("Password changed successfully", 200));
     }
-    @PutMapping(value = "/profile", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<User> updateProfile(
-            @AuthenticationPrincipal UserDetails userDetails,
-            @ModelAttribute UpdateProfileRequest request) throws Exception {
+  @PutMapping(value = "/profile", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+public ResponseEntity<User> updateProfile(
+        @AuthenticationPrincipal UserDetails userDetails,
+        @CookieValue(name = ACCESS_TOKEN_COOKIE, required = false) String accessToken,
+        @ModelAttribute UpdateProfileRequest request) throws Exception {
 
-        User updatedUser = userService.updateProfile(userDetails.getUsername(), request);
-        return ResponseEntity.ok(updatedUser);
+    String email = null;
+
+    if (userDetails != null && userDetails.getUsername() != null && !userDetails.getUsername().isBlank()) {
+        email = userDetails.getUsername();
+    } else if (accessToken != null && !accessToken.isBlank()) {
+        email = jwtService.extractUsername(accessToken);
     }
+
+    if (email == null || email.isBlank()) {
+        throw new BadCredentialsException("No active session.");
+    }
+
+    User updatedUser = userService.updateProfile(email, request);
+    return ResponseEntity.ok(updatedUser);
+}
 
     private ResponseEntity<AuthResponse> withAuthCookies(String accessToken, String refreshToken, User user, String role, boolean rememberMe) {
         HttpHeaders headers = new HttpHeaders();
@@ -315,6 +339,12 @@ public class AuthController {
 
     private String getCookieSameSite() {
         return isCookieSecure() ? COOKIE_SAME_SITE_PROD : COOKIE_SAME_SITE_DEV;
+    }
+
+    private ResponseEntity<Void> redirectToOAuth2Provider(String provider) {
+        return ResponseEntity.status(302)
+                .location(URI.create("/oauth2/authorize/" + provider))
+                .build();
     }
 
 }
