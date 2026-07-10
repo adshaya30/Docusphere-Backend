@@ -3,13 +3,16 @@ package com.docusphere.backend.documentShare.controller;
 import com.docusphere.backend.Common.exception.DocumentNotFoundException;
 import com.docusphere.backend.Common.exception.InvalidRequestException;
 import com.docusphere.backend.Common.exception.UnauthorizedAccessException;
+import com.docusphere.backend.authentication.repository.UserRepository;
 import com.docusphere.backend.authentication.service.JwtService;
+import com.docusphere.backend.comment.repository.CommentRepository;
 import com.docusphere.backend.documentShare.dto.CreateShareLinkRequest;
 import com.docusphere.backend.documentShare.dto.CreateShareLinkResponse;
 import com.docusphere.backend.documentShare.dto.SharedDocumentResponse;
 import com.docusphere.backend.documentShare.entity.DocumentSharePermission;
 import com.docusphere.backend.documentShare.entity.ShareLinkType;
 import com.docusphere.backend.documentShare.service.DocumentSharingService;
+import com.docusphere.backend.onlyoffice.service.OnlyOfficeEditorConfigService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -18,6 +21,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -44,7 +48,19 @@ class DocumentSharingControllerTest {
     private DocumentSharingService documentSharingService;
 
     @MockitoBean
+    private OnlyOfficeEditorConfigService onlyOfficeEditorConfigService;
+
+    @MockitoBean
+    private CommentRepository commentRepository;
+
+    @MockitoBean
+    private UserRepository userRepository;
+
+    @MockitoBean
     private JwtService jwtService;
+
+    @MockitoBean
+    private UserDetailsService userDetailsService;
 
     private UUID documentId;
     private Long userId;

@@ -1,5 +1,6 @@
 package com.docusphere.backend.documentProtection.service;
 
+import com.docusphere.backend.audit.service.AuditService;
 import com.docusphere.backend.Common.exception.DocumentNotFoundException;
 import com.docusphere.backend.Common.exception.InvalidPasswordException;
 import com.docusphere.backend.Common.exception.InvalidRequestException;
@@ -23,19 +24,22 @@ public class DocumentPasswordProtectionService {
     private final DocumentPasswordAccessGuard accessGuard;
     private final DocumentPasswordVerificationStore verificationStore;
     private final PasswordValidator passwordValidator;
+    private final AuditService auditService;
 
     public DocumentPasswordProtectionService(
             DocumentRepository documentRepository,
             PasswordEncoder passwordEncoder,
             DocumentPasswordAccessGuard accessGuard,
             DocumentPasswordVerificationStore verificationStore,
-            PasswordValidator passwordValidator
+            PasswordValidator passwordValidator,
+            AuditService auditService
     ) {
         this.documentRepository = documentRepository;
         this.passwordEncoder = passwordEncoder;
         this.accessGuard = accessGuard;
         this.verificationStore = verificationStore;
         this.passwordValidator = passwordValidator;
+        this.auditService = auditService;
     }
 
     @Transactional
@@ -87,6 +91,7 @@ public class DocumentPasswordProtectionService {
 
         if (document.getPasswordHash() == null
                 || !passwordEncoder.matches(password, document.getPasswordHash())) {
+            recordPasswordAudit("PASSWORD_VALIDATION_FAILED", documentId, requesterId, shareToken);
             throw new InvalidPasswordException("Incorrect document password");
         }
 
@@ -94,6 +99,7 @@ public class DocumentPasswordProtectionService {
                 ? "user:" + requesterId
                 : "share:" + (shareToken != null ? shareToken.trim() : "");
         verificationStore.markVerified(documentId, principalKey);
+        recordPasswordAudit("PASSWORD_PROTECTED_ACCESS_GRANTED", documentId, requesterId, shareToken);
 
         return PasswordVerificationResponse.builder()
                 .documentId(documentId)
@@ -124,7 +130,27 @@ public class DocumentPasswordProtectionService {
         if (!accessGuard.hasDocumentAccess(document, requesterId, shareToken)) {
             throw new UnauthorizedAccessException("You do not have access to this document");
         }
-        accessGuard.requirePasswordAccess(document, password, requesterId, shareToken);
+        if (document.isPasswordProtected()) {
+            recordPasswordAudit("PASSWORD_PROTECTED_ACCESS_ATTEMPT", document.getId(), requesterId, shareToken);
+        }
+        try {
+            accessGuard.requirePasswordAccess(document, password, requesterId, shareToken);
+        } catch (InvalidPasswordException | com.docusphere.backend.Common.exception.DocumentPasswordRequiredException ex) {
+            recordPasswordAudit("PASSWORD_VALIDATION_FAILED", document.getId(), requesterId, shareToken);
+            throw ex;
+        }
+    }
+
+    private void recordPasswordAudit(String action, UUID documentId, Long requesterId, String shareToken) {
+        java.util.Map<String, Object> metadata = new java.util.HashMap<>();
+        metadata.put("documentId", documentId.toString());
+        if (requesterId != null) {
+            metadata.put("userId", requesterId);
+        }
+        if (shareToken != null && !shareToken.isBlank()) {
+            metadata.put("shareToken", shareToken.trim());
+        }
+        auditService.record(action, metadata);
     }
 
     private Document requireActiveDocument(UUID documentId) {

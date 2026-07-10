@@ -1,5 +1,6 @@
 package com.docusphere.backend.documentAction.service;
 
+import com.docusphere.backend.Common.exception.ConflictException;
 import com.docusphere.backend.Common.exception.DocumentNotFoundException;
 import com.docusphere.backend.Common.exception.FileUploadException;
 import com.docusphere.backend.Common.exception.InvalidRequestException;
@@ -25,6 +26,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
+import com.docusphere.backend.onlyoffice.service.OnlyOfficeDownloadTokenService;
+import io.jsonwebtoken.Claims;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -44,6 +47,7 @@ public class DocumentActionServiceImpl implements DocumentActionService {
     private final AuditService auditService;
     private final DocumentSharingService documentSharingService;
     private final DocumentPasswordProtectionService documentPasswordProtectionService;
+    private final OnlyOfficeDownloadTokenService onlyOfficeDownloadTokenService;
     private final String supabaseUrl;
     private final String bucketName;
     private final RestTemplate restTemplate = new RestTemplate();
@@ -56,6 +60,7 @@ public class DocumentActionServiceImpl implements DocumentActionService {
             AuditService auditService,
             DocumentSharingService documentSharingService,
             DocumentPasswordProtectionService documentPasswordProtectionService,
+            OnlyOfficeDownloadTokenService onlyOfficeDownloadTokenService,
             @Value("${supabase.url}") String supabaseUrl,
             @Value("${supabase.bucket.documents:documents}") String bucketName
     ) {
@@ -65,6 +70,7 @@ public class DocumentActionServiceImpl implements DocumentActionService {
         this.auditService = auditService;
         this.documentSharingService = documentSharingService;
         this.documentPasswordProtectionService = documentPasswordProtectionService;
+        this.onlyOfficeDownloadTokenService = onlyOfficeDownloadTokenService;
         this.supabaseUrl = supabaseUrl;
         this.bucketName = bucketName;
     }
@@ -76,7 +82,7 @@ public class DocumentActionServiceImpl implements DocumentActionService {
             @Value("${supabase.url}") String supabaseUrl,
             @Value("${supabase.bucket.documents:documents}") String bucketName
     ) {
-        this(documentRepository, fileStorageService, teamAccessValidator, null, null, null, supabaseUrl, bucketName);
+        this(documentRepository, fileStorageService, teamAccessValidator, null, null, null, null, supabaseUrl, bucketName);
     }
 
     @Override
@@ -88,7 +94,9 @@ public class DocumentActionServiceImpl implements DocumentActionService {
 
         Document document = requireActiveDocument(documentId);
         ensureOwner(document, requesterId);
-        document.setName(newName.trim());
+        String trimmedName = newName.trim();
+        ensureUniqueName(document, trimmedName);
+        document.setName(trimmedName);
         return toResponse(documentRepository.save(document));
     }
 
@@ -236,6 +244,12 @@ public class DocumentActionServiceImpl implements DocumentActionService {
 
     @Override
     @Transactional(readOnly = true)
+    public Resource downloadForSystem(UUID documentId) {
+        throw new UnauthorizedAccessException("Direct system download is not permitted");
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public String resolveDownloadFilename(Long requesterId, UUID documentId, String password) {
         Document document = requireActiveDocument(documentId);
         ensureAccessible(document, requesterId);
@@ -250,6 +264,7 @@ public class DocumentActionServiceImpl implements DocumentActionService {
             throw new FileUploadException("Document sharing service is not available");
         }
         Document document = documentSharingService.checkReadAccessByShareToken(documentId, token);
+        documentSharingService.recordShareDownload(documentId, token);
         ensurePasswordVerified(document, password, null, token);
         return new ByteArrayResource(loadDocumentBytes(document));
     }
@@ -263,6 +278,87 @@ public class DocumentActionServiceImpl implements DocumentActionService {
         Document document = documentSharingService.checkReadAccessByShareToken(documentId, token);
         ensurePasswordVerified(document, password, null, token);
         return document.getName();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Resource downloadByOnlyOfficeToken(UUID documentId, String dlToken, String urlShareToken) {
+        OnlyOfficeDownloadContext context = resolveOnlyOfficeDownloadContext(documentId, dlToken, urlShareToken);
+        if (context.shareToken() != null && !context.shareToken().isBlank()) {
+            documentSharingService.recordShareDownload(documentId, context.shareToken());
+        }
+        return new ByteArrayResource(loadDocumentBytes(context.document()));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public String resolveDownloadFilenameByOnlyOfficeToken(UUID documentId, String dlToken, String urlShareToken) {
+        OnlyOfficeDownloadContext context = resolveOnlyOfficeDownloadContext(documentId, dlToken, urlShareToken);
+        return context.document().getName();
+    }
+
+    private OnlyOfficeDownloadContext resolveOnlyOfficeDownloadContext(UUID documentId, String dlToken) {
+        return resolveOnlyOfficeDownloadContext(documentId, dlToken, null);
+    }
+
+    private OnlyOfficeDownloadContext resolveOnlyOfficeDownloadContext(
+            UUID documentId,
+            String dlToken,
+            String urlShareToken
+    ) {
+        if (dlToken == null || dlToken.isBlank()) {
+            throw new UnauthorizedAccessException("Download token is required");
+        }
+
+        Claims claims = onlyOfficeDownloadTokenService.parseToken(dlToken.trim());
+        String claimDocumentId = claims.get("documentId", String.class);
+        if (claimDocumentId == null || !claimDocumentId.equals(documentId.toString())) {
+            throw new UnauthorizedAccessException("Download token does not match document");
+        }
+
+        Long userId = claims.get("userId", Number.class) != null
+                ? claims.get("userId", Number.class).longValue()
+                : null;
+        String shareToken = claims.get("shareToken", String.class);
+
+        if (urlShareToken != null && !urlShareToken.isBlank()) {
+            if (shareToken == null || shareToken.isBlank()) {
+                throw new UnauthorizedAccessException("Share token is required for this download");
+            }
+            if (!shareToken.trim().equals(urlShareToken.trim())) {
+                throw new UnauthorizedAccessException("Share token does not match download authorization");
+            }
+        }
+
+        Document document;
+        if (shareToken != null && !shareToken.isBlank()) {
+            document = documentSharingService.checkReadAccessByShareToken(documentId, shareToken);
+        } else {
+            document = requireActiveDocument(documentId);
+            if (userId == null) {
+                throw new UnauthorizedAccessException("Download token is invalid");
+            }
+            ensureAccessible(document, userId);
+        }
+
+        return new OnlyOfficeDownloadContext(document, userId, shareToken);
+    }
+
+    private record OnlyOfficeDownloadContext(Document document, Long userId, String shareToken) {
+    }
+
+    private void ensureUniqueName(Document document, String newName) {
+        boolean duplicate;
+        if (document.getTeamId() == null) {
+            duplicate = documentRepository.existsByOwnerIdAndNameAndDeletedFalseAndIdNot(
+                    document.getOwnerId(), newName, document.getId());
+        } else {
+            duplicate = documentRepository.existsByOwnerIdAndTeamIdAndNameAndDeletedFalseAndIdNot(
+                    document.getOwnerId(), document.getTeamId(), newName, document.getId());
+        }
+        if (duplicate) {
+            throw new ConflictException("A document with this name already exists.");
+        }
     }
 
     private void ensurePasswordVerified(Document document, String password, Long requesterId, String shareToken) {

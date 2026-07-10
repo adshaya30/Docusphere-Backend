@@ -2,6 +2,7 @@ package com.docusphere.backend.Common.config;
 
 import com.docusphere.backend.authentication.service.security.JwtAuthenticationFilter;
 import com.docusphere.backend.authentication.service.security.OAuth2AuthenticationSuccessHandler;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -12,7 +13,6 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.web.SecurityFilterChain;
@@ -49,20 +49,36 @@ public class SecurityConfig {
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
-                .oauth2Login(oauth2 -> oauth2.successHandler(oAuth2AuthenticationSuccessHandler))
+                .oauth2Login(oauth2 -> oauth2
+                        .loginPage("/login")
+                        .authorizationEndpoint(authz -> authz.baseUri("/oauth2/authorize"))
+                        .redirectionEndpoint(redir -> redir.baseUri("/api/auth/oauth2/callback/*"))
+                        .successHandler(oAuth2AuthenticationSuccessHandler)
+                )
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/", "/error", "/favicon.ico").permitAll()
-                        .requestMatchers("/oauth2/**", "/login/**").permitAll()
+                        .requestMatchers("/", "/login", "/error", "/favicon.ico").permitAll()
+                        .requestMatchers("/oauth2/**", "/api/auth/oauth2/callback/**").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers("/api/ocr/**").permitAll()
                         .requestMatchers("/api/share/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/documents/*/download").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/editor/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/editor/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/documents/*/verify-password").permitAll()
+                        .requestMatchers("/api/onlyoffice/callback").permitAll()
+                        .requestMatchers("/api/documents/{documentId}/download").permitAll()
+                        .requestMatchers("/api/documents/{documentId}/versions/{versionId}/download").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/documents/*/versions/summary").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/admin/**").hasRole("ADMIN")
                         .requestMatchers("/user/**").hasAnyRole("USER", "ADMIN")
                         .anyRequest().authenticated())
                 // Tell Spring Security to not create sessions since we're using JWTs
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .exceptionHandling(exception -> exception
+                        .authenticationEntryPoint((request, response, authException) -> {
+                            response.sendError(HttpServletResponse.SC_UNAUTHORIZED);
+                        })
+                )
                 .authenticationProvider(daoAuthenticationProvider())
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
@@ -85,13 +101,13 @@ public class SecurityConfig {
         return source;
     }
 
-    // Configure the DaoAuthenticationProvider to use our custom UserDetailsService
-    // and password encoder
     @Bean
     public AuthenticationProvider daoAuthenticationProvider() {
-        DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
-        provider.setUserDetailsService(userDetailsService);
+        DaoAuthenticationProvider provider =
+                new DaoAuthenticationProvider(userDetailsService);
+    
         provider.setPasswordEncoder(passwordEncoder);
+    
         return provider;
     }
 
