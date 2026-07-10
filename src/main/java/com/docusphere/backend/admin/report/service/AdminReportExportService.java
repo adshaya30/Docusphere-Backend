@@ -2,7 +2,6 @@ package com.docusphere.backend.admin.report.service;
 
 import com.docusphere.backend.authentication.entity.User;
 import com.docusphere.backend.authentication.repository.UserRepository;
-import com.docusphere.backend.document.entity.Document;
 import com.docusphere.backend.document.repository.DocumentRepository;
 import com.docusphere.backend.team.entity.Team;
 import com.docusphere.backend.team.repository.TeamRepository;
@@ -78,7 +77,7 @@ public class AdminReportExportService {
     public byte[] exportUsersToCSV() throws IOException {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         OutputStreamWriter osw = new OutputStreamWriter(baos);
-        CSVFormat csvFormat = CSVFormat.DEFAULT.withHeader("User ID", "Name", "Email", "Role");
+        CSVFormat csvFormat = CSVFormat.DEFAULT.builder().setHeader("User ID", "Name", "Email", "Role").build();
         CSVPrinter csvPrinter = new CSVPrinter(osw, csvFormat);
 
         List<User> users = userRepository.findAll();
@@ -92,6 +91,7 @@ public class AdminReportExportService {
         }
 
         csvPrinter.flush();
+        csvPrinter.close();
         osw.close();
         return baos.toByteArray();
     }
@@ -136,7 +136,7 @@ public class AdminReportExportService {
     public byte[] exportTeamsToCSV() throws IOException {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         OutputStreamWriter osw = new OutputStreamWriter(baos);
-        CSVFormat csvFormat = CSVFormat.DEFAULT.withHeader("Team ID", "Team Name", "Members", "Created Date");
+        CSVFormat csvFormat = CSVFormat.DEFAULT.builder().setHeader("Team ID", "Team Name", "Members", "Created Date").build();
         CSVPrinter csvPrinter = new CSVPrinter(osw, csvFormat);
 
         List<Team> teams = teamRepository.findAll();
@@ -150,6 +150,7 @@ public class AdminReportExportService {
         }
 
         csvPrinter.flush();
+        csvPrinter.close();
         osw.close();
         return baos.toByteArray();
     }
@@ -209,7 +210,7 @@ public class AdminReportExportService {
     public byte[] exportDocumentsToCSV() throws IOException {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         OutputStreamWriter osw = new OutputStreamWriter(baos);
-        CSVFormat csvFormat = CSVFormat.DEFAULT.withHeader("Document ID", "Name", "Type", "Size (bytes)", "Owner Email", "Team", "Status", "Created Date");
+        CSVFormat csvFormat = CSVFormat.DEFAULT.builder().setHeader("Document ID", "Name", "Type", "Size (bytes)", "Owner Email", "Team", "Status", "Created Date").build();
         CSVPrinter csvPrinter = new CSVPrinter(osw, csvFormat);
 
         List<com.docusphere.backend.document.entity.Document> docs = documentRepository.findAll();
@@ -233,6 +234,7 @@ public class AdminReportExportService {
         }
 
         csvPrinter.flush();
+        csvPrinter.close();
         osw.close();
         return baos.toByteArray();
     }

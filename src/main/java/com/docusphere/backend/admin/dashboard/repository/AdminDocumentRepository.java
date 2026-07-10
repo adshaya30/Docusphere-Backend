@@ -2,13 +2,13 @@ package com.docusphere.backend.admin.dashboard.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.domain.Pageable;
+
 import org.springframework.stereotype.Repository;
 
 import com.docusphere.backend.document.entity.Document;
 
 import java.util.List;
-import java.util.Optional;
+
 
 @Repository
 public interface AdminDocumentRepository extends JpaRepository<Document, Long> {

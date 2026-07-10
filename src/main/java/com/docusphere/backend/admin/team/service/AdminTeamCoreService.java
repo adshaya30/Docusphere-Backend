@@ -17,13 +17,13 @@ import com.docusphere.backend.team.repository.TeamMemberRepository;
 import com.docusphere.backend.team.repository.TeamRepository;
 import com.docusphere.backend.team.repository.UserActivityRepository;
 import com.docusphere.backend.team.service.TeamService;
-import jakarta.persistence.EntityNotFoundException;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
+
 
 @Service
 public class AdminTeamCoreService {

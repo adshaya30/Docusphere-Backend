@@ -14,7 +14,7 @@ import com.docusphere.backend.team.entity.TeamRole;
 import com.docusphere.backend.team.repository.TeamInvitationRepository;
 import com.docusphere.backend.team.repository.TeamMemberRepository;
 import com.docusphere.backend.team.repository.TeamRepository;
-import jakarta.mail.MessagingException;
+
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -83,11 +83,11 @@ public class AdminTeamMemberService {
     @Transactional
     public void transferLeader(UUID teamId, TransferLeaderRequest req) {
         if (req.getNewLeaderId() == null) throw new IllegalArgumentException("Target leader ID cannot be null");
-        
+
         TeamMember curr = teamMemberRepository.findLeaderByTeamId(teamId).orElseThrow(() -> new EntityNotFoundException("No leader"));
         TeamMember next = teamMemberRepository.findByUserIdAndTeamId(req.getNewLeaderId(), teamId)
                 .orElseThrow(() -> new EntityNotFoundException("Target member must be a 'Joined' user. Pending invitations cannot be leaders."));
-        
+
         if (next.getRole() == TeamRole.LEADER) throw new IllegalStateException("Already leader");
         curr.setRole(TeamRole.MEMBER); next.setRole(TeamRole.LEADER);
         teamMemberRepository.save(curr); teamMemberRepository.save(next);

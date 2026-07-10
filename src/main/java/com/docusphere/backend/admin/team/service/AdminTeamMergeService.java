@@ -1,6 +1,6 @@
 package com.docusphere.backend.admin.team.service;
 
-import com.docusphere.backend.authentication.repository.UserRepository;
+
 import com.docusphere.backend.team.entity.Team;
 import com.docusphere.backend.team.entity.TeamInvitation;
 import com.docusphere.backend.team.entity.TeamMember;
@@ -40,16 +40,16 @@ public class AdminTeamMergeService {
     @Transactional
     public Team mergeTeams(UUID sourceId, UUID targetId, String name, Long leaderId, boolean moveDocuments) {
         log.info("Starting merge: source={}, target={}, newName={}, moveDocs={}", sourceId, targetId, name, moveDocuments);
-        
+
         if (sourceId.equals(targetId)) throw new IllegalArgumentException("Cannot merge same team");
-        
+
         if (teamRepository.existsByTeamName(name)) {
             throw new IllegalArgumentException("A team with the name '" + name + "' already exists. Please choose a unique name.");
         }
 
         Team src = queryService.assertTeamExists(sourceId);
         Team tgt = queryService.assertTeamExists(targetId);
-        
+
         Team mTeam = new Team();
         mTeam.setTeamName(name);
         mTeam.setDescription("Merged from " + src.getTeamName() + " and " + tgt.getTeamName());
@@ -66,14 +66,14 @@ public class AdminTeamMergeService {
                 }
             });
             log.info("Finished moving members for team: {}", id);
-            
+
             // Move Invitations
             teamInvitationRepository.findAllByTeamId(id).forEach(oldInvite -> {
                 if (teamInvitationRepository.findByEmailAndTeamId(oldInvite.getEmail(), merged.getId()).isEmpty()) {
                     saveInvite(merged.getId(), oldInvite);
                 }
             });
-            
+
             // Optional: Move Documents
             if (moveDocuments) {
                 log.info("Moving documents for team: {}", id);
@@ -85,7 +85,7 @@ public class AdminTeamMergeService {
         // Ensure members are in DB before promotion
         log.info("Flushing member changes to DB...");
         teamMemberRepository.flush();
-        
+
         try {
             log.info("Promoting leader with ID: {}", leaderId);
             promoteLeader(leaderId, merged.getId());
@@ -96,7 +96,7 @@ public class AdminTeamMergeService {
 
         merged.setMemberCount(users.size());
         merged.setDocumentCount(documentRepository.findAllByTeamId(merged.getId()).size());
-        
+
         log.info("Merge completed successfully for team: {}", name);
         return teamRepository.save(merged);
     }
