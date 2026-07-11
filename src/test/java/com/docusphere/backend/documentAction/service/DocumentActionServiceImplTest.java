@@ -306,7 +306,6 @@ class DocumentActionServiceImplTest {
 
         when(documentRepository.findByIdAndDeletedFalse(documentId))
                 .thenReturn(Optional.of(mockDocument));
-        when(teamAccessValidator.isMember(otherUserId, teamId)).thenReturn(false);
 
         // Act & Assert
         UnauthorizedAccessException exception = assertThrows(
@@ -314,7 +313,7 @@ class DocumentActionServiceImplTest {
                 () -> documentActionService.duplicate(otherUserId, documentId)
         );
 
-        assertEquals("You do not have access to this document", exception.getMessage());
+        assertEquals("Only the owner can perform this action", exception.getMessage());
     }
 
     // ==================== MOVE TO TRASH TESTS ====================

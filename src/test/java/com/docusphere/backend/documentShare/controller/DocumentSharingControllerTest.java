@@ -220,7 +220,7 @@ class DocumentSharingControllerTest {
         mockMvc.perform(post("/api/documents/{id}/share", documentId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isInternalServerError());
+                .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -322,7 +322,7 @@ class DocumentSharingControllerTest {
         // Act & Assert
         mockMvc.perform(delete("/api/documents/{id}/share", documentId)
                 .header("Authorization", authToken))
-                .andExpect(status().isInternalServerError());
+                .andExpect(status().isBadRequest());
     }
 
     // ==================== OPEN SHARED DOCUMENT TESTS ====================

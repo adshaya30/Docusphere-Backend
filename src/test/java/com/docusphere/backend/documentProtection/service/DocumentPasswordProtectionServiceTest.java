@@ -17,6 +17,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.util.ReflectionTestUtils;
+import com.docusphere.backend.documentShare.service.DocumentSharingService;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -40,6 +42,9 @@ class DocumentPasswordProtectionServiceTest {
     @Mock
     private AuditService auditService;
 
+    @Mock
+    private DocumentSharingService documentSharingService;
+
     private PasswordEncoder passwordEncoder;
     private PasswordValidator passwordValidator;
     private DocumentPasswordVerificationStore verificationStore;
@@ -55,6 +60,7 @@ class DocumentPasswordProtectionServiceTest {
         passwordValidator = new PasswordValidator();
         verificationStore = new DocumentPasswordVerificationStore();
         accessGuard = new DocumentPasswordAccessGuard(passwordEncoder, verificationStore, teamAccessValidator);
+        ReflectionTestUtils.setField(accessGuard, "documentSharingService", documentSharingService);
         service = new DocumentPasswordProtectionService(
                 documentRepository,
                 passwordEncoder,
@@ -185,6 +191,21 @@ class DocumentPasswordProtectionServiceTest {
 
         assertDoesNotThrow(() ->
                 service.requirePasswordForContentAccess(document, null, 10L, null)
+        );
+    }
+
+    @Test
+    void requirePasswordForContentAccess_shouldAllowShareDownloadAfterLoggedInVerification() {
+        document.setPasswordProtected(true);
+        document.setPasswordHash(passwordEncoder.encode(DOCUMENT_PASSWORD));
+        when(documentRepository.findByIdAndDeletedFalse(documentId)).thenReturn(Optional.of(document));
+
+        String shareToken = "public-share-token";
+        when(documentSharingService.checkReadAccessByShareToken(documentId, shareToken)).thenReturn(document);
+        service.verifyPassword(10L, documentId, DOCUMENT_PASSWORD, shareToken);
+
+        assertDoesNotThrow(() ->
+                service.requirePasswordForContentAccess(document, null, null, shareToken)
         );
     }
 }

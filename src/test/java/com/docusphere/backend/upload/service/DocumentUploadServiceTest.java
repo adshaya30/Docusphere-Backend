@@ -6,6 +6,7 @@ import com.docusphere.backend.document.entity.Document;
 import com.docusphere.backend.document.repository.DocumentRepository;
 import com.docusphere.backend.document.storage.FileStorageService;
 import com.docusphere.backend.documentAction.service.TeamAccessValidator;
+import com.docusphere.backend.team.repository.TeamRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -26,6 +27,7 @@ class DocumentUploadServiceTest {
     private DocumentRepository documentRepository;
     private FileStorageService fileStorageService;
     private TeamAccessValidator teamAccessValidator;
+    private TeamRepository teamRepository;
     private DocumentUploadService documentUploadService;
 
     @TempDir
@@ -36,10 +38,12 @@ class DocumentUploadServiceTest {
         documentRepository = mock(DocumentRepository.class);
         fileStorageService = mock(FileStorageService.class);
         teamAccessValidator = mock(TeamAccessValidator.class);
+        teamRepository = mock(TeamRepository.class);
         documentUploadService = new DocumentUploadService(
                 documentRepository,
                 fileStorageService,
                 teamAccessValidator,
+                teamRepository,
                 tempRoot.toString()
         );
     }

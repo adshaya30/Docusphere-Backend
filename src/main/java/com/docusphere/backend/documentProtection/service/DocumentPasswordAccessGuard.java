@@ -43,8 +43,7 @@ public class DocumentPasswordAccessGuard {
             return;
         }
 
-        String principalKey = resolvePrincipalKey(requesterId, shareToken);
-        if (verificationStore.isVerified(document.getId(), principalKey)) {
+        if (hasVerifiedAccess(document.getId(), requesterId, shareToken)) {
             return;
         }
 
@@ -57,7 +56,25 @@ public class DocumentPasswordAccessGuard {
             throw new InvalidPasswordException("Incorrect document password");
         }
 
-        verificationStore.markVerified(document.getId(), principalKey);
+        markVerifiedAccess(document.getId(), requesterId, shareToken);
+    }
+
+    public void markVerifiedAccess(UUID documentId, Long requesterId, String shareToken) {
+        if (requesterId != null) {
+            verificationStore.markVerified(documentId, userKey(requesterId));
+        }
+        if (shareToken != null && !shareToken.isBlank()) {
+            verificationStore.markVerified(documentId, shareKey(shareToken));
+        }
+    }
+
+    public boolean hasVerifiedAccess(UUID documentId, Long requesterId, String shareToken) {
+        if (requesterId != null && verificationStore.isVerified(documentId, userKey(requesterId))) {
+            return true;
+        }
+        return shareToken != null
+                && !shareToken.isBlank()
+                && verificationStore.isVerified(documentId, shareKey(shareToken));
     }
 
     public boolean hasDocumentAccess(Document document, Long requesterId, String shareToken) {
@@ -84,11 +101,19 @@ public class DocumentPasswordAccessGuard {
 
     private String resolvePrincipalKey(Long requesterId, String shareToken) {
         if (requesterId != null) {
-            return "user:" + requesterId;
+            return userKey(requesterId);
         }
         if (shareToken != null && !shareToken.isBlank()) {
-            return "share:" + shareToken.trim();
+            return shareKey(shareToken);
         }
         return "anonymous";
+    }
+
+    private String userKey(Long requesterId) {
+        return "user:" + requesterId;
+    }
+
+    private String shareKey(String shareToken) {
+        return "share:" + shareToken.trim();
     }
 }

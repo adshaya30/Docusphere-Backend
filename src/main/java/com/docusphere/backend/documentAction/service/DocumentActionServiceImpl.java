@@ -49,6 +49,7 @@ public class DocumentActionServiceImpl implements DocumentActionService {
     private final DocumentSharingService documentSharingService;
     private final DocumentPasswordProtectionService documentPasswordProtectionService;
     private final OnlyOfficeDownloadTokenService onlyOfficeDownloadTokenService;
+    private final DocumentEditPermissionService documentEditPermissionService;
     private final String supabaseUrl;
     private final String bucketName;
     private final RestTemplate restTemplate = new RestTemplate();
@@ -62,6 +63,7 @@ public class DocumentActionServiceImpl implements DocumentActionService {
             DocumentSharingService documentSharingService,
             DocumentPasswordProtectionService documentPasswordProtectionService,
             OnlyOfficeDownloadTokenService onlyOfficeDownloadTokenService,
+            DocumentEditPermissionService documentEditPermissionService,
             @Value("${supabase.url}") String supabaseUrl,
             @Value("${supabase.bucket.documents:documents}") String bucketName
     ) {
@@ -72,6 +74,7 @@ public class DocumentActionServiceImpl implements DocumentActionService {
         this.documentSharingService = documentSharingService;
         this.documentPasswordProtectionService = documentPasswordProtectionService;
         this.onlyOfficeDownloadTokenService = onlyOfficeDownloadTokenService;
+        this.documentEditPermissionService = documentEditPermissionService;
         this.supabaseUrl = supabaseUrl;
         this.bucketName = bucketName;
     }
@@ -83,7 +86,7 @@ public class DocumentActionServiceImpl implements DocumentActionService {
             @Value("${supabase.url}") String supabaseUrl,
             @Value("${supabase.bucket.documents:documents}") String bucketName
     ) {
-        this(documentRepository, fileStorageService, teamAccessValidator, null, null, null, null, supabaseUrl, bucketName);
+        this(documentRepository, fileStorageService, teamAccessValidator, null, null, null, null, null, supabaseUrl, bucketName);
     }
 
     @Override

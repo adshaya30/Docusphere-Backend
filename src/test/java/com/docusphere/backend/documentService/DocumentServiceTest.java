@@ -4,6 +4,7 @@ import com.docusphere.backend.Common.exception.InvalidRequestException;
 import com.docusphere.backend.document.repository.DocumentRepository;
 import com.docusphere.backend.document.service.DocumentService;
 import com.docusphere.backend.document.storage.FileStorageService;
+import com.docusphere.backend.documentShare.repository.DocumentShareRepository;
 import com.docusphere.backend.documentStar.dto.DocumentStarResponse;
 import com.docusphere.backend.documentStar.service.DocumentStarService;
 import com.docusphere.backend.team.repository.TeamRepository;
@@ -36,11 +37,20 @@ class DocumentServiceTest {
     @Mock
     private TeamRepository teamRepository;
 
+    @Mock
+    private DocumentShareRepository documentShareRepository;
+
     private DocumentService documentService;
 
     @BeforeEach
     void setUp() {
-        documentService = new DocumentService(documentStarService, documentRepository, fileStorageService, teamRepository);
+        documentService = new DocumentService(
+                documentStarService,
+                documentRepository,
+                fileStorageService,
+                teamRepository,
+                documentShareRepository
+        );
     }
 
     // ==================== STAR TESTS ====================
