@@ -79,17 +79,6 @@ public class AdminNotificationHelper {
             metadata("member", "transfer_leader", teamName));
     }
 
-    public void notifyDocumentDeleted(Long adminUserId, UUID documentId, String documentName, String teamName) {
-        String message = teamName != null
-            ? String.format("Deleted \"%s\" from team \"%s\".", documentName, teamName)
-            : String.format("Deleted document \"%s\".", documentName);
-        publish(adminUserId, NotificationType.ADMIN_DOCUMENT_DELETED,
-            "Admin · Document deleted",
-            message,
-            "document", documentId, "/admin/documents",
-            metadata("document", "delete", documentName));
-    }
-
     public void notifyUserRegistered(Long adminUserId, UUID userId, String userEmail, String userName) {
         publish(adminUserId, NotificationType.ADMIN_USER_REGISTERED,
             "Admin · New user registered",

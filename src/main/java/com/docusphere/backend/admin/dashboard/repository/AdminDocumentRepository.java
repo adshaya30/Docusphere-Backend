@@ -56,4 +56,6 @@ public interface AdminDocumentRepository extends JpaRepository<Document, Long> {
    """, nativeQuery = true)
    Long getPreviousMonthDocumentCount();
 
+    @Query("SELECT COALESCE(SUM(d.sizeBytes), 0) FROM Document d")
+    Long sumTotalStorageBytes();
 }
