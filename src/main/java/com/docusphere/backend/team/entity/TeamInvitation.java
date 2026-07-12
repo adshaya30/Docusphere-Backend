@@ -30,6 +30,12 @@ public class TeamInvitation {
     @Column(name = "invited_at", nullable = false)
     private LocalDateTime invitedAt;
 
+    @Column(name = "inviter_id")
+    private Long inviterId;
+
+    @Column(name = "inviter_name")
+    private String inviterName;
+
     @PrePersist
     protected void onCreate() {
         this.invitedAt = LocalDateTime.now();

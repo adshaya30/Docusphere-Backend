@@ -187,4 +187,18 @@ public class UserTeamController {
         userDocumentService.deleteDocument(documentId, userId, teamId);
         return ResponseEntity.noContent().build();
     }
+
+    @PostMapping("/invitations/{invitationId}/accept")
+    public ResponseEntity<Void> acceptInvitation(@PathVariable UUID invitationId, HttpServletRequest request) {
+        Long userId = getUserId(request);
+        userTeamService.acceptInvitation(invitationId, userId);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/invitations/{invitationId}/decline")
+    public ResponseEntity<Void> declineInvitation(@PathVariable UUID invitationId, HttpServletRequest request) {
+        Long userId = getUserId(request);
+        userTeamService.declineInvitation(invitationId, userId);
+        return ResponseEntity.ok().build();
+    }
 }
