@@ -8,6 +8,7 @@ import com.docusphere.backend.document.storage.FileStorageService;
 import com.docusphere.backend.documentAction.service.TeamAccessValidator;
 import com.docusphere.backend.team.repository.TeamRepository;
 import com.docusphere.backend.Common.exception.UnauthorizedAccessException;
+import com.docusphere.backend.notification.service.StorageAlertService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -33,6 +34,7 @@ public class DocumentUploadService {
     private final FileStorageService fileStorageService;
     private final TeamAccessValidator teamAccessValidator;
     private final TeamRepository teamRepository;
+    private final StorageAlertService storageAlertService;
 
     private final Path tempDir;
 
@@ -41,12 +43,14 @@ public class DocumentUploadService {
             FileStorageService fileStorageService,
             TeamAccessValidator teamAccessValidator,
             TeamRepository teamRepository,
+            StorageAlertService storageAlertService,
             @Value("${app.upload.dir:uploads}") String baseDir) throws Exception {
 
         this.documentRepository = repository;
         this.fileStorageService = fileStorageService;
         this.teamAccessValidator = teamAccessValidator;
         this.teamRepository = teamRepository;
+        this.storageAlertService = storageAlertService;
 
         Path uploadDir = Paths.get(baseDir).toAbsolutePath().normalize();
         this.tempDir = uploadDir.resolve(TEMP_FOLDER);
@@ -205,6 +209,11 @@ public class DocumentUploadService {
             Document saved = documentRepository.save(doc);
             if (teamId != null) {
                 teamRepository.incrementDocumentCount(teamId);
+            }
+            try {
+                storageAlertService.checkAndAlertStorageUsage();
+            } catch (Exception e) {
+                LOGGER.error("Failed to check storage warning limit: {}", e.getMessage());
             }
             return UploadResult.completed(saved.getId().toString());
 

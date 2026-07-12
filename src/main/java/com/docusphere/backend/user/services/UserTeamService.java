@@ -51,7 +51,6 @@ import jakarta.persistence.EntityNotFoundException;
 public class UserTeamService {
     private static final String TEAM_INVITE_QUERY = "/?teamInvite=1";
 
-
     private final TeamRepository teamRepository;
     private final TeamMemberRepository teamMemberRepository;
     private final TeamInvitationRepository teamInvitationRepository;
@@ -69,24 +68,22 @@ public class UserTeamService {
     private final NotificationRepository notificationRepository;
     private final AdminNotificationHelper adminNotificationHelper;
 
-
-
     public UserTeamService(TeamRepository teamRepository,
-                           TeamMemberRepository teamMemberRepository,
-                           TeamInvitationRepository teamInvitationRepository,
-                           TeamService teamService,
-                           UserRepository userRepository,
-                           EmailService emailService,
-                           AppConfig appConfig,
-                           DocumentRepository documentRepository,
-                           FileStorageService fileStorageService,
-                           UserActivityRepository userActivityRepository,
-                           DocumentStarRepository documentStarRepository,
-                           DocumentShareRepository documentShareRepository,
-                           SimpMessagingTemplate messagingTemplate,
-                           NotificationHelper notificationHelper,
-                           NotificationRepository notificationRepository,
-                           AdminNotificationHelper adminNotificationHelper) {
+            TeamMemberRepository teamMemberRepository,
+            TeamInvitationRepository teamInvitationRepository,
+            TeamService teamService,
+            UserRepository userRepository,
+            EmailService emailService,
+            AppConfig appConfig,
+            DocumentRepository documentRepository,
+            FileStorageService fileStorageService,
+            UserActivityRepository userActivityRepository,
+            DocumentStarRepository documentStarRepository,
+            DocumentShareRepository documentShareRepository,
+            SimpMessagingTemplate messagingTemplate,
+            NotificationHelper notificationHelper,
+            NotificationRepository notificationRepository,
+            AdminNotificationHelper adminNotificationHelper) {
         this.teamRepository = teamRepository;
         this.teamMemberRepository = teamMemberRepository;
         this.teamInvitationRepository = teamInvitationRepository;
@@ -107,6 +104,7 @@ public class UserTeamService {
 
     /**
      * Leader creates a team — automatically becomes LEADER.
+     * 
      * @param name        team name
      * @param description optional description
      * @param leaderId    userId from JWT
@@ -134,7 +132,7 @@ public class UserTeamService {
         if (initialMembers != null) {
             for (AddMemberRequest memberReq : initialMembers) {
                 try {
-                    addMemberInternal(savedTeam, memberReq, user.getFullName());
+                    addMemberInternal(savedTeam, memberReq, user.getFullName(), leaderId);
                 } catch (Exception e) {
                     // Log error but continue for other members
                 }
@@ -192,7 +190,7 @@ public class UserTeamService {
         }
 
         for (Document document : teamDocuments) {
-        
+
             try {
                 fileStorageService.deleteFile(document.getStorageKey());
             } catch (Exception ignored) {
@@ -205,7 +203,7 @@ public class UserTeamService {
         userActivityRepository.deleteByTeamId(teamId);
         teamInvitationRepository.deleteByTeamId(teamId);
         teamMemberRepository.deleteByTeamId(teamId);
-        
+
         // 3. Delete the team itself
         teamRepository.deleteById(teamId);
     }
@@ -251,11 +249,11 @@ public class UserTeamService {
             invitation.setInviterName(inviterName);
             TeamInvitation savedInvite = teamInvitationRepository.save(invitation);
 
-
             // Notify the user via in-app notification (TEAM_INVITATION type)
             try {
                 UUID userUuid = NotificationUserIds.fromUserId(user.getId());
-                notificationHelper.notifyTeamInvitation(userUuid, team.getId(), team.getTeamName(), savedInvite.getId(), inviterName);
+                notificationHelper.notifyTeamInvitation(userUuid, team.getId(), team.getTeamName(), savedInvite.getId(),
+                        inviterName);
             } catch (Exception e) {
                 // Non-fatal
             }
@@ -275,7 +273,7 @@ public class UserTeamService {
                         if (teamMemberRepository.existsByUserIdAndTeamId(user.getId(), team.getId())) {
                             throw new IllegalStateException("User is already in the team");
                         }
-                        
+
                         // Create team invitation instead of adding directly
                         TeamInvitation invitation = new TeamInvitation();
                         invitation.setEmail(email);
@@ -285,11 +283,11 @@ public class UserTeamService {
                         invitation.setInviterName(inviterName);
                         TeamInvitation savedInvite = teamInvitationRepository.save(invitation);
 
-
                         // Notify the user via in-app notification (TEAM_INVITATION type)
                         try {
                             UUID userUuid = NotificationUserIds.fromUserId(user.getId());
-                            notificationHelper.notifyTeamInvitation(userUuid, team.getId(), team.getTeamName(), savedInvite.getId(), inviterName);
+                            notificationHelper.notifyTeamInvitation(userUuid, team.getId(), team.getTeamName(),
+                                    savedInvite.getId(), inviterName);
                         } catch (Exception e) {
                             // Non-fatal
                         }
@@ -311,10 +309,10 @@ public class UserTeamService {
                         invitation.setInviterName(inviterName);
                         TeamInvitation savedInvite = teamInvitationRepository.save(invitation);
 
-
                         // Send email
                         try {
-                            emailService.sendTeamInvitationEmail(email, team.getTeamName(), inviterName, appConfig.getFrontendUrl() + TEAM_INVITE_QUERY);
+                            emailService.sendTeamInvitationEmail(email, team.getTeamName(), inviterName,
+                                    appConfig.getFrontendUrl() + TEAM_INVITE_QUERY);
                         } catch (MessagingException e) {
                             // Non-fatal, invitation is still saved
                         }
@@ -341,15 +339,16 @@ public class UserTeamService {
 
         for (TeamInvitation invitation : invitations) {
             teamRepository.findById(invitation.getTeamId()).ifPresent(team -> {
-                // Instead of auto-joining, publish the team invitation notification so they see it in the notifications bell
+                // Instead of auto-joining, publish the team invitation notification so they see
+                // it in the notifications bell
                 try {
                     UUID userUuid = NotificationUserIds.fromUserId(user.getId());
                     // Check if invitation notification already exists to prevent duplication
                     List<Notification> existing = notificationRepository.findByUserIdAndTypeAndInvitationId(
-                        userUuid, NotificationType.TEAM_INVITATION, invitation.getId().toString()
-                    );
+                            userUuid, NotificationType.TEAM_INVITATION, invitation.getId().toString());
                     if (existing.isEmpty()) {
-                        notificationHelper.notifyTeamInvitation(userUuid, team.getId(), team.getTeamName(), invitation.getId(), "System");
+                        notificationHelper.notifyTeamInvitation(userUuid, team.getId(), team.getTeamName(),
+                                invitation.getId(), "System");
                     }
                 } catch (Exception e) {
                     // Non-fatal
@@ -393,10 +392,12 @@ public class UserTeamService {
                 User inviterUser = userRepository.findById(inviterId).orElse(null);
                 if (inviterUser != null) {
                     if (inviterUser.getRole().getName().equalsIgnoreCase("ROLE_ADMIN")) {
-                        adminNotificationHelper.notifyTeamInvitationAccepted(inviterId, team.getTeamName(), user.getFullName());
+                        adminNotificationHelper.notifyTeamInvitationAccepted(inviterId, team.getTeamName(),
+                                user.getFullName());
                     } else {
                         UUID inviterUuid = NotificationUserIds.fromUserId(inviterId);
-                        notificationHelper.notifyTeamInvitationAccepted(inviterUuid, team.getTeamName(), user.getFullName());
+                        notificationHelper.notifyTeamInvitationAccepted(inviterUuid, team.getTeamName(),
+                                user.getFullName());
                     }
                 }
             } else {
@@ -410,14 +411,15 @@ public class UserTeamService {
             // Non-fatal
         }
 
-        // Update notification metadata to set status as joined so they are not pressable again
+        // Update notification metadata to set status as joined so they are not
+        // pressable again
         try {
             UUID userUuid = NotificationUserIds.fromUserId(userId);
             List<Notification> notifications = notificationRepository.findByUserIdAndTypeAndInvitationId(
-                userUuid, NotificationType.TEAM_INVITATION, invitationId.toString()
-            );
+                    userUuid, NotificationType.TEAM_INVITATION, invitationId.toString());
             for (Notification n : notifications) {
-                n.setMetadata(String.format("{\"teamId\":\"%s\",\"invitationId\":\"%s\",\"status\":\"joined\"}", team.getId(), invitationId));
+                n.setMetadata(String.format("{\"teamId\":\"%s\",\"invitationId\":\"%s\",\"status\":\"joined\"}",
+                        team.getId(), invitationId));
                 notificationRepository.save(n);
             }
         } catch (Exception e) {
@@ -449,10 +451,12 @@ public class UserTeamService {
                 User inviterUser = userRepository.findById(inviterId).orElse(null);
                 if (inviterUser != null) {
                     if (inviterUser.getRole().getName().equalsIgnoreCase("ROLE_ADMIN")) {
-                        adminNotificationHelper.notifyTeamInvitationDeclined(inviterId, team.getTeamName(), user.getFullName());
+                        adminNotificationHelper.notifyTeamInvitationDeclined(inviterId, team.getTeamName(),
+                                user.getFullName());
                     } else {
                         UUID inviterUuid = NotificationUserIds.fromUserId(inviterId);
-                        notificationHelper.notifyTeamInvitationDeclined(inviterUuid, team.getTeamName(), user.getFullName());
+                        notificationHelper.notifyTeamInvitationDeclined(inviterUuid, team.getTeamName(),
+                                user.getFullName());
                     }
                 }
             } else {
@@ -466,14 +470,15 @@ public class UserTeamService {
             // Non-fatal
         }
 
-        // Update notification metadata to set status as declined so they are not pressable again
+        // Update notification metadata to set status as declined so they are not
+        // pressable again
         try {
             UUID userUuid = NotificationUserIds.fromUserId(userId);
             List<Notification> notifications = notificationRepository.findByUserIdAndTypeAndInvitationId(
-                userUuid, NotificationType.TEAM_INVITATION, invitationId.toString()
-            );
+                    userUuid, NotificationType.TEAM_INVITATION, invitationId.toString());
             for (Notification n : notifications) {
-                n.setMetadata(String.format("{\"teamId\":\"%s\",\"invitationId\":\"%s\",\"status\":\"declined\"}", team.getId(), invitationId));
+                n.setMetadata(String.format("{\"teamId\":\"%s\",\"invitationId\":\"%s\",\"status\":\"declined\"}",
+                        team.getId(), invitationId));
                 notificationRepository.save(n);
             }
         } catch (Exception e) {
@@ -482,6 +487,7 @@ public class UserTeamService {
 
         teamInvitationRepository.delete(invitation);
     }
+
     @Transactional
     public void removeMember(UUID teamId, Long memberUserId, Long requesterId) {
         if (!teamService.isUserRoleInTeam(requesterId, teamId, TeamRole.LEADER)) {
@@ -535,7 +541,8 @@ public class UserTeamService {
         // Notify the member that their role was updated
         try {
             UUID memberUserUuid = NotificationUserIds.fromUserId(memberUserId);
-            notificationHelper.notifyUserRoleUpdated(memberUserUuid, teamId, membership.getTeam().getTeamName(), role.name());
+            notificationHelper.notifyUserRoleUpdated(memberUserUuid, teamId, membership.getTeam().getTeamName(),
+                    role.name());
         } catch (Exception e) {
             // Non-fatal
         }
@@ -573,7 +580,8 @@ public class UserTeamService {
         // Notify the former leader that their role is now MEMBER
         try {
             UUID oldLeaderUuid = NotificationUserIds.fromUserId(requesterId);
-            notificationHelper.notifyUserRoleUpdated(oldLeaderUuid, teamId, currentLeader.getTeam().getTeamName(), "MEMBER");
+            notificationHelper.notifyUserRoleUpdated(oldLeaderUuid, teamId, currentLeader.getTeam().getTeamName(),
+                    "MEMBER");
         } catch (Exception e) {
             // Non-fatal
         }
@@ -581,7 +589,8 @@ public class UserTeamService {
         // Notify the new leader that their role is now LEADER
         try {
             UUID newLeaderUuid = NotificationUserIds.fromUserId(request.getNewLeaderId());
-            notificationHelper.notifyUserRoleUpdated(newLeaderUuid, teamId, nextLeader.getTeam().getTeamName(), "LEADER");
+            notificationHelper.notifyUserRoleUpdated(newLeaderUuid, teamId, nextLeader.getTeam().getTeamName(),
+                    "LEADER");
         } catch (Exception e) {
             // Non-fatal
         }
@@ -605,11 +614,10 @@ public class UserTeamService {
 
         try {
             Map<String, Object> payload = Map.of(
-                "type", "CHAT_BLOCK_UPDATE",
-                "userId", memberUserId,
-                "blocked", blocked,
-                "teamId", teamId.toString()
-            );
+                    "type", "CHAT_BLOCK_UPDATE",
+                    "userId", memberUserId,
+                    "blocked", blocked,
+                    "teamId", teamId.toString());
             messagingTemplate.convertAndSend("/topic/teams/" + teamId + "/chat", payload);
         } catch (Exception e) {
             // Keep going if WS fails

@@ -106,26 +106,6 @@ public class NotificationTestController {
     }
 
     /**
-     * Send a document shared notification (USER audience)
-     */
-    @PostMapping("/user/send-document-shared")
-    @Operation(summary = "Send document shared USER notification")
-    public ResponseEntity<?> sendDocumentSharedNotification(HttpServletRequest request) {
-        UUID userId = extractUserIdFromToken(request);
-        UUID testDocumentId = UUID.randomUUID();
-        
-        notificationHelper.notifyDocumentShared(
-            userId,
-            testDocumentId,
-            "Test Document - Project Report.pdf",
-            "John Doe"
-        );
-        
-        log.info("Document shared USER notification sent to user: {}", userId);
-        return ResponseEntity.ok("Document shared USER notification sent");
-    }
-
-    /**
      * Send a team invitation notification (USER audience)
      */
     @PostMapping("/user/send-team-invitation")
@@ -326,27 +306,6 @@ public class NotificationTestController {
         
         log.info("Member removed ADMIN notification sent to admin: {}", adminUserId);
         return ResponseEntity.ok("Member removed ADMIN notification sent");
-    }
-
-    /**
-     * Send a document deleted ADMIN notification (ADMIN audience - requires ADMIN role)
-     */
-    @PostMapping("/admin/send-document-deleted")
-    @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Send document deleted ADMIN notification")
-    public ResponseEntity<?> sendAdminDocumentDeleted(HttpServletRequest request) {
-        Long adminUserId = extractUserIdLongFromToken(request);
-        UUID testDocId = UUID.randomUUID();
-        
-        adminNotificationHelper.notifyDocumentDeleted(
-            adminUserId,
-            testDocId,
-            "Test Document.pdf",
-            "Test Team"
-        );
-        
-        log.info("Document deleted ADMIN notification sent to admin: {}", adminUserId);
-        return ResponseEntity.ok("Document deleted ADMIN notification sent");
     }
 
     /**

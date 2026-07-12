@@ -58,6 +58,10 @@ public interface DocumentRepository extends JpaRepository<Document, UUID>,
 
     @Modifying
     void deleteByTeamId(UUID teamId);
+
+    @Query("SELECT SUM(d.sizeBytes) FROM Document d")
+    Long sumTotalStorageBytes();
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT d FROM Document d WHERE d.id = :id AND d.deleted = false")
     Optional<Document> findActiveByIdForUpdate(@Param("id") UUID id);

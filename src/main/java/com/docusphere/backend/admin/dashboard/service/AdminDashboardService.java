@@ -11,6 +11,7 @@ import com.docusphere.backend.admin.dashboard.repository.*;
 
 import com.docusphere.backend.Common.exception.AdminDashboardException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -22,6 +23,9 @@ public class AdminDashboardService {
 
     @Autowired
     private AdminUserRepository userRepository;
+
+    @Value("${docusphere.storage.quota-bytes:1073741824}")
+    private long storageQuotaBytes;
 
     @Autowired
     private AdminDocumentRepository documentRepository;
@@ -146,6 +150,18 @@ public class AdminDashboardService {
             dto.setSessionGrowth(sessionGrowth);
             dto.setMonthlyUploads(monthlyUploads);
             dto.setTopTeams(topTeams);
+
+            Long usedStorageBytes = 0L;
+            try {
+                usedStorageBytes = documentRepository.sumTotalStorageBytes();
+                if (usedStorageBytes == null) {
+                    usedStorageBytes = 0L;
+                }
+            } catch (Exception e) {
+                logger.error("Error querying sumTotalStorageBytes: {}", e.getMessage());
+            }
+            dto.setUsedStorageBytes(usedStorageBytes);
+            dto.setStorageQuotaBytes(storageQuotaBytes);
 
             logger.info("Dashboard data successfully compiled");
             return dto;
