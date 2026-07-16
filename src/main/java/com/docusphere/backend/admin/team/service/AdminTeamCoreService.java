@@ -1,6 +1,7 @@
 package com.docusphere.backend.admin.team.service;
 
 import com.docusphere.backend.admin.team.dto.AdminCreateTeamRequest;
+import com.docusphere.backend.Common.exception.ConflictException;
 import com.docusphere.backend.authentication.entity.User;
 import com.docusphere.backend.authentication.repository.UserRepository;
 import com.docusphere.backend.document.entity.Document;
@@ -47,6 +48,14 @@ public class AdminTeamCoreService {
 
     @Transactional
     public TeamDto createTeam(AdminCreateTeamRequest req) {
+        String normalizedName = req.getName() == null ? "" : req.getName().trim();
+        if (normalizedName.isEmpty()) {
+            throw new IllegalArgumentException("Team name is required");
+        }
+        if (teamRepository.existsByTeamName(normalizedName)) {
+            throw new ConflictException("A team with this name already exists. Please try a different name.");
+        }
+
         User leader = null;
 
         // 1. Try to find if a leader was explicitly assigned in the additional members list
