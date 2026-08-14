@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.docusphere.backend.authentication.service.JwtService;
@@ -108,7 +109,18 @@ public class UserTeamController {
         if (!teamService.isUserInTeam(userId, teamId)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
+        userTeamService.touchMemberLastSeen(teamId, userId);
         return ResponseEntity.ok(teamService.getTeamMemberStatuses(teamId));
+    }
+
+    @PostMapping("/{teamId}/presence")
+    public ResponseEntity<Void> recordTeamPresence(@PathVariable UUID teamId, HttpServletRequest request) {
+        Long userId = getUserId(request);
+        if (!teamService.isUserInTeam(userId, teamId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        userTeamService.recordTeamPageAccess(teamId, userId);
+        return ResponseEntity.ok().build();
     }
 
     @GetMapping("/{teamId}/documents")
@@ -155,10 +167,38 @@ public class UserTeamController {
         return ResponseEntity.ok().build();
     }
 
+    @PutMapping("/{teamId}/members/{memberId}/chat-block")
+    public ResponseEntity<Void> updateMemberChatBlock(
+            @PathVariable UUID teamId,
+            @PathVariable Long memberId,
+            @RequestParam boolean blocked,
+            HttpServletRequest request) {
+        Long userId = getUserId(request);
+        if (!teamService.isUserInTeam(userId, teamId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        userTeamService.setMemberChatAccess(teamId, memberId, blocked, userId);
+        return ResponseEntity.ok().build();
+    }
+
     @DeleteMapping("/{teamId}/documents/{documentId}")
     public ResponseEntity<Void> deleteDocument(@PathVariable UUID teamId, @PathVariable UUID documentId, HttpServletRequest request) {
         Long userId = getUserId(request);
         userDocumentService.deleteDocument(documentId, userId, teamId);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/invitations/{invitationId}/accept")
+    public ResponseEntity<Void> acceptInvitation(@PathVariable UUID invitationId, HttpServletRequest request) {
+        Long userId = getUserId(request);
+        userTeamService.acceptInvitation(invitationId, userId);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/invitations/{invitationId}/decline")
+    public ResponseEntity<Void> declineInvitation(@PathVariable UUID invitationId, HttpServletRequest request) {
+        Long userId = getUserId(request);
+        userTeamService.declineInvitation(invitationId, userId);
+        return ResponseEntity.ok().build();
     }
 }

@@ -2642,3 +2642,88 @@ Caused by: java.lang.RuntimeException: Driver org.postgresql.Driver claims to no
 2026-08-14T14:59:56.200+05:30  INFO 28808 --- [SpringApplicationShutdownHook] j.LocalContainerEntityManagerFactoryBean : Closing JPA EntityManagerFactory for persistence unit 'default'
 2026-08-14T14:59:56.205+05:30  INFO 28808 --- [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown initiated...
 2026-08-14T14:59:56.612+05:30  INFO 28808 --- [SpringApplicationShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown completed.
+2026-08-14T15:05:33.024+05:30  INFO 9788 --- [File Watcher] rtingClassPathChangeChangedEventListener : Restarting due to 127 class path changes (86 additions, 0 deletions, 41 modifications)
+2026-08-14T15:05:33.031+05:30  INFO 9788 --- [Thread-5] o.s.b.w.e.tomcat.GracefulShutdown        : Commencing graceful shutdown. Waiting for active requests to complete
+2026-08-14T15:05:33.039+05:30  INFO 9788 --- [tomcat-shutdown] o.s.b.w.e.tomcat.GracefulShutdown        : Graceful shutdown complete
+2026-08-14T15:05:33.056+05:30  INFO 9788 --- [Thread-5] j.LocalContainerEntityManagerFactoryBean : Closing JPA EntityManagerFactory for persistence unit 'default'
+2026-08-14T15:05:33.063+05:30  INFO 9788 --- [Thread-5] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown initiated...
+2026-08-14T15:05:33.144+05:30  INFO 9788 --- [Thread-5] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown completed.
+2026-08-14T15:05:33.289+05:30  INFO 9788 --- [restartedMain] c.docusphere.backend.BackendApplication  : Starting BackendApplication using Java 25.0.1 with PID 9788 (E:\DOCUMENT ANLYSY05\Docusphere-Backend\target\classes started by User in E:\DOCUMENT ANLYSY05\Docusphere-Backend)
+2026-08-14T15:05:33.291+05:30  INFO 9788 --- [restartedMain] c.docusphere.backend.BackendApplication  : No active profile set, falling back to 1 default profile: "default"
+2026-08-14T15:05:33.313+05:30  WARN 9788 --- [restartedMain] .i.s.PathMatchingResourcePatternResolver : Failed to search in directory [E:\DOCUMENT ANLYSY05\Docusphere-Backend\target\classes\com\docusphere\backend] for files matching pattern [**/*.class]: java.io.UncheckedIOException: java.nio.file.NoSuchFileException: E:\DOCUMENT ANLYSY05\Docusphere-Backend\target\classes\com\docusphere\backend\notification\event
+2026-08-14T15:05:34.213+05:30  INFO 9788 --- [restartedMain] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-08-14T15:05:34.257+05:30  INFO 9788 --- [restartedMain] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 36 ms. Found 0 JPA repository interfaces.
+2026-08-14T15:05:34.493+05:30  INFO 9788 --- [restartedMain] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8080 (http)
+2026-08-14T15:05:34.495+05:30  INFO 9788 --- [restartedMain] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-08-14T15:05:34.497+05:30  INFO 9788 --- [restartedMain] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.52]
+2026-08-14T15:05:34.545+05:30  INFO 9788 --- [restartedMain] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+2026-08-14T15:05:34.545+05:30  INFO 9788 --- [restartedMain] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 1240 ms
+2026-08-14T15:05:34.732+05:30  INFO 9788 --- [restartedMain] com.zaxxer.hikari.HikariDataSource       : HikariPool-2 - Starting...
+2026-08-14T15:05:35.631+05:30  INFO 9788 --- [restartedMain] com.zaxxer.hikari.pool.HikariPool        : HikariPool-2 - Added connection org.postgresql.jdbc.PgConnection@258622ce
+2026-08-14T15:05:35.641+05:30  INFO 9788 --- [restartedMain] com.zaxxer.hikari.HikariDataSource       : HikariPool-2 - Start completed.
+2026-08-14T15:05:35.754+05:30  INFO 9788 --- [restartedMain] org.flywaydb.core.FlywayExecutor         : Database: jdbc:postgresql://aws-1-ap-south-1.pooler.supabase.com:5432/postgres?sslmode=require&prepareThreshold=0 (PostgreSQL 17.6)
+2026-08-14T15:05:37.515+05:30  INFO 9788 --- [restartedMain] o.f.core.internal.command.DbMigrate      : Current version of schema "public": 45
+2026-08-14T15:05:37.519+05:30 ERROR 9788 --- [restartedMain] o.f.core.internal.command.DbMigrate      : Schema "public" has version 45, but no migration could be resolved in the configured locations !
+2026-08-14T15:05:37.602+05:30  INFO 9788 --- [restartedMain] o.f.core.internal.command.DbMigrate      : Schema "public" is up to date. No migration necessary.
+2026-08-14T15:05:38.252+05:30  INFO 9788 --- [restartedMain] o.hibernate.jpa.internal.util.LogHelper  : HHH000204: Processing PersistenceUnitInfo [name: default]
+2026-08-14T15:05:38.255+05:30  INFO 9788 --- [restartedMain] o.h.c.internal.RegionFactoryInitiator    : HHH000026: Second-level cache disabled
+2026-08-14T15:05:38.268+05:30  INFO 9788 --- [restartedMain] o.s.o.j.p.SpringPersistenceUnitInfo      : No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-08-14T15:05:38.372+05:30  WARN 9788 --- [restartedMain] org.hibernate.orm.deprecation            : HHH90000025: PostgreSQLDialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+2026-08-14T15:05:38.536+05:30  INFO 9788 --- [restartedMain] org.hibernate.orm.connections.pooling    : HHH10001005: Database info:
+	Database JDBC URL [Connecting through datasource 'HikariDataSource (HikariPool-2)']
+	Database driver: undefined/unknown
+	Database version: 17.6
+	Autocommit mode: undefined/unknown
+	Isolation level: undefined/unknown
+	Minimum pool size: undefined/unknown
+	Maximum pool size: undefined/unknown
+2026-08-14T15:05:38.870+05:30  INFO 9788 --- [restartedMain] o.h.e.t.j.p.i.JtaPlatformInitiator       : HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-08-14T15:05:39.220+05:30  INFO 9788 --- [restartedMain] j.LocalContainerEntityManagerFactoryBean : Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-08-14T15:05:39.281+05:30  WARN 9788 --- [restartedMain] JpaBaseConfiguration$JpaWebConfiguration : spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
+2026-08-14T15:05:39.466+05:30  WARN 9788 --- [restartedMain] ion$DefaultTemplateResolverConfiguration : Cannot find template location: classpath:/templates/ (please add some templates, check your Thymeleaf configuration, or set spring.thymeleaf.check-template-location=false)
+2026-08-14T15:05:39.660+05:30 DEBUG 9788 --- [restartedMain] swordEncoderAuthenticationManagerBuilder : No authenticationProviders and no parentAuthenticationManager defined. Returning null.
+2026-08-14T15:05:39.717+05:30 DEBUG 9788 --- [restartedMain] o.s.s.web.DefaultSecurityFilterChain     : Will secure any request with filters: DisableEncodeUrlFilter, WebAsyncManagerIntegrationFilter, SecurityContextHolderFilter, HeaderWriterFilter, CsrfFilter, LogoutFilter, OAuth2AuthorizationRequestRedirectFilter, OAuth2AuthorizationRequestRedirectFilter, OAuth2LoginAuthenticationFilter, DefaultResourcesFilter, DefaultLoginPageGeneratingFilter, DefaultLogoutPageGeneratingFilter, RequestCacheAwareFilter, SecurityContextHolderAwareRequestFilter, AnonymousAuthenticationFilter, OAuth2AuthorizationCodeGrantFilter, ExceptionTranslationFilter, AuthorizationFilter
+2026-08-14T15:05:39.751+05:30  INFO 9788 --- [restartedMain] o.s.b.a.e.web.EndpointLinksResolver      : Exposing 1 endpoint beneath base path '/actuator'
+2026-08-14T15:05:39.771+05:30  INFO 9788 --- [restartedMain] o.s.b.d.a.OptionalLiveReloadServer       : LiveReload server is running on port 35729
+2026-08-14T15:05:39.792+05:30  INFO 9788 --- [restartedMain] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8080 (http) with context path '/'
+2026-08-14T15:05:39.802+05:30  INFO 9788 --- [restartedMain] c.docusphere.backend.BackendApplication  : Started BackendApplication in 6.582 seconds (process running for 14586.857)
+2026-08-14T15:05:39.807+05:30  INFO 9788 --- [restartedMain] .ConditionEvaluationDeltaLoggingListener : Condition evaluation delta:
+
+
+==========================
+CONDITION EVALUATION DELTA
+==========================
+
+
+Positive matches:
+-----------------
+
+   OAuth2ClientWebSecurityAutoConfiguration.OAuth2SecurityFilterChainConfiguration matched:
+      - AllNestedConditions 2 matched 0 did not; NestedCondition on DefaultWebSecurityCondition.Beans @ConditionalOnMissingBean (types: org.springframework.security.web.SecurityFilterChain; SearchStrategy: all) did not find any beans; NestedCondition on DefaultWebSecurityCondition.Classes @ConditionalOnClass found required classes 'org.springframework.security.web.SecurityFilterChain', 'org.springframework.security.config.annotation.web.builders.HttpSecurity' (DefaultWebSecurityCondition)
+
+
+Negative matches:
+-----------------
+
+    None
+
+
+Exclusions:
+-----------
+
+    None
+
+
+Unconditional classes:
+----------------------
+
+    None
+
+
+
+2026-08-14T15:05:41.230+05:30  INFO 9788 --- [File Watcher] rtingClassPathChangeChangedEventListener : Restarting due to 325 class path changes (0 additions, 20 deletions, 305 modifications)
+2026-08-14T15:05:41.232+05:30  INFO 9788 --- [Thread-8] o.s.b.w.e.tomcat.GracefulShutdown        : Commencing graceful shutdown. Waiting for active requests to complete
+2026-08-14T15:05:41.237+05:30  INFO 9788 --- [tomcat-shutdown] o.s.b.w.e.tomcat.GracefulShutdown        : Graceful shutdown complete
+2026-08-14T15:05:41.240+05:30  INFO 9788 --- [Thread-8] j.LocalContainerEntityManagerFactoryBean : Closing JPA EntityManagerFactory for persistence unit 'default'
+2026-08-14T15:05:41.241+05:30  INFO 9788 --- [Thread-8] com.zaxxer.hikari.HikariDataSource       : HikariPool-2 - Shutdown initiated...
+2026-08-14T15:05:41.479+05:30  INFO 9788 --- [Thread-8] com.zaxxer.hikari.HikariDataSource       : HikariPool-2 - Shutdown completed.

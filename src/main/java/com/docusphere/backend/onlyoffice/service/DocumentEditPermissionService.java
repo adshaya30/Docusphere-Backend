@@ -64,10 +64,36 @@ public class DocumentEditPermissionService {
         }
 
         if (role == TeamRole.MEMBER) {
-            // Member can only edit if they are the uploader (ownerId of the document)
-            return document.getOwnerId().equals(userId);
+            // All members can edit team documents
+            return true;
         }
 
         return false;
+    }
+
+    /**
+     * Checks if the user is authorized to restore a document version.
+     * Personal documents: owner only.
+     * Team documents: owner, team leader, or manager (not regular members).
+     */
+    public boolean canRestore(Document document, Long userId) {
+        if (document == null || userId == null) {
+            return false;
+        }
+        if (document.getTeamId() == null) {
+            return document.getOwnerId().equals(userId);
+        }
+
+        if (document.getOwnerId().equals(userId)) {
+            return true;
+        }
+
+        Optional<TeamMember> membershipOpt = teamService.findMembership(userId, document.getTeamId());
+        if (membershipOpt.isEmpty()) {
+            return false;
+        }
+
+        TeamRole role = membershipOpt.get().getRole();
+        return role == TeamRole.LEADER || role == TeamRole.MANAGER;
     }
 }

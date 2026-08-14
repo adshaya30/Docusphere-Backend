@@ -2,8 +2,12 @@ package com.docusphere.backend.Common.config;
 
 import com.docusphere.backend.authentication.service.security.JwtAuthenticationFilter;
 import com.docusphere.backend.authentication.service.security.OAuth2AuthenticationSuccessHandler;
+import jakarta.servlet.http.HttpServletResponse;
+import java.util.Arrays;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
@@ -13,14 +17,14 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.http.HttpMethod;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-import java.util.Arrays;
+import com.docusphere.backend.authentication.service.security.JwtAuthenticationFilter;
+import com.docusphere.backend.authentication.service.security.OAuth2AuthenticationSuccessHandler;
 
 @Configuration
 @EnableMethodSecurity
@@ -60,14 +64,27 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/ocr/**").permitAll()
                         .requestMatchers("/api/share/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/editor/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/editor/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/documents/*/verify-password").permitAll()
+                        .requestMatchers("/api/onlyoffice/callback").permitAll()
+                        .requestMatchers("/api/documents/{documentId}/download").permitAll()
+                        .requestMatchers("/api/documents/{documentId}/versions/{versionId}/download").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/documents/*/versions/summary").permitAll()
                         .requestMatchers("/api/onlyoffice/callback").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/documents/*/download").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/admin/**").hasRole("ADMIN")
                         .requestMatchers("/user/**").hasAnyRole("USER", "ADMIN")
+                        .requestMatchers("/ws-chat/**").permitAll()
                         .anyRequest().authenticated())
                 // Tell Spring Security to not create sessions since we're using JWTs
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .exceptionHandling(exception -> exception
+                        .authenticationEntryPoint((request, response, authException) -> {
+                            response.sendError(HttpServletResponse.SC_UNAUTHORIZED);
+                        })
+                )
                 .authenticationProvider(daoAuthenticationProvider())
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 

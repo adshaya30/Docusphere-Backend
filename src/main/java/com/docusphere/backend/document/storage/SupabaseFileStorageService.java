@@ -1,12 +1,10 @@
 package com.docusphere.backend.document.storage;
-
 import com.docusphere.backend.Common.exception.FileUploadException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
-
 import java.io.File;
 
 /**
@@ -33,7 +31,7 @@ public class SupabaseFileStorageService implements FileStorageService {
     @Override
     public String copyFile(String sourcePath, String targetPath) {
         byte[] sourceBytes = loadFile(sourcePath);
-        uploadBytes(sourceBytes, targetPath);
+        upsertBytes(sourceBytes, targetPath);
         return targetPath;
     }
 
@@ -122,15 +120,19 @@ public class SupabaseFileStorageService implements FileStorageService {
     // ------------------------ Helpers -----------------------------------
 
     private void uploadBytes(byte[] content, String targetPath) {
+        upsertBytes(content, targetPath);
+    }
+
+    private void upsertBytes(byte[] content, String targetPath) {
         String url = buildObjectUrl(targetPath);
         HttpHeaders headers = buildAuthHeaders();
         headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
-        headers.set("x-upsert", "false");
+        headers.set("x-upsert", "true");
         HttpEntity<byte[]> request = new HttpEntity<>(content, headers);
 
         ResponseEntity<String> response = restTemplate.exchange(
                 url,
-                HttpMethod.POST,
+                HttpMethod.PUT,
                 request,
                 String.class
         );

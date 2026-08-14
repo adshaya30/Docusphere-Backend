@@ -11,17 +11,21 @@ import com.docusphere.backend.admin.dashboard.repository.*;
 
 import com.docusphere.backend.Common.exception.AdminDashboardException;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.PageRequest;
+import org.springframework.beans.factory.annotation.Value;
+
 import java.util.ArrayList;
 import java.util.List;
 
 @Service
 public class AdminDashboardService {
-    
+
     private static final Logger logger = LoggerFactory.getLogger(AdminDashboardService.class);
 
     @Autowired
     private AdminUserRepository userRepository;
+
+    @Value("${docusphere.storage.quota-bytes:1073741824}")
+    private long storageQuotaBytes;
 
     @Autowired
     private AdminDocumentRepository documentRepository;
@@ -46,7 +50,7 @@ public class AdminDashboardService {
             } catch (Exception e) {
                 logger.error("Error querying auth.sessions (this is expected if schema is restricted): {}", e.getMessage());
             }
-            
+
             // Fallback to active team members if sessions are 0 or query failed
             if (activeSessionsCount == null || activeSessionsCount == 0) {
                 try {
@@ -57,9 +61,9 @@ public class AdminDashboardService {
                     logger.warn("Could not fetch active members count: {}", e.getMessage());
                 }
             }
-            
+
             long activeSessions = activeSessionsCount != null ? activeSessionsCount : 0L;
-            
+
             logger.info("Dashboard counts - Users: {}, Docs: {}, Teams: {}, Sessions: {}", totalUsers, totalDocs, totalTeams, activeSessions);
 
             // Calculate monthly growth for documents
@@ -88,10 +92,10 @@ public class AdminDashboardService {
             if (previousMonthTeams == null)
                 previousMonthTeams = 0L;
             Double teamGrowth = calculateGrowthPercentage(currentMonthTeams, previousMonthTeams);
-            
+
             // For sessions, we don't have historical data yet, so we'll use 0.0 or a mock calculation
             Double sessionGrowth = 0.0;
-            
+
             logger.info("Growth metrics - Docs: {}%, Users: {}%, Teams: {}%, Sessions: {}%", documentGrowth, userGrowth, teamGrowth, sessionGrowth);
 
             // Get monthly uploads
@@ -146,7 +150,19 @@ public class AdminDashboardService {
             dto.setSessionGrowth(sessionGrowth);
             dto.setMonthlyUploads(monthlyUploads);
             dto.setTopTeams(topTeams);
-            
+
+            Long usedStorageBytes = 0L;
+            try {
+                usedStorageBytes = documentRepository.sumTotalStorageBytes();
+                if (usedStorageBytes == null) {
+                    usedStorageBytes = 0L;
+                }
+            } catch (Exception e) {
+                logger.error("Error querying sumTotalStorageBytes: {}", e.getMessage());
+            }
+            dto.setUsedStorageBytes(usedStorageBytes);
+            dto.setStorageQuotaBytes(storageQuotaBytes);
+
             logger.info("Dashboard data successfully compiled");
             return dto;
         } catch (Exception e) {
@@ -158,11 +174,11 @@ public class AdminDashboardService {
     private Double calculateGrowthPercentage(Long currentMonth, Long previousMonth) {
         long current = (currentMonth != null) ? currentMonth : 0L;
         long previous = (previousMonth != null) ? previousMonth : 0L;
-        
+
         if (previous == 0) {
             return current > 0 ? 100.0 : 0.0;
         }
-        
+
         double growth = ((double) (current - previous) / previous) * 100.0;
         // Round to 2 decimal places
         return Math.round(growth * 100.0) / 100.0;

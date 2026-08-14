@@ -4,8 +4,10 @@ import com.docusphere.backend.Common.exception.InvalidRequestException;
 import com.docusphere.backend.document.repository.DocumentRepository;
 import com.docusphere.backend.document.service.DocumentService;
 import com.docusphere.backend.document.storage.FileStorageService;
+import com.docusphere.backend.documentShare.repository.DocumentShareRepository;
 import com.docusphere.backend.documentStar.dto.DocumentStarResponse;
 import com.docusphere.backend.documentStar.service.DocumentStarService;
+import com.docusphere.backend.team.repository.TeamRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -32,11 +34,23 @@ class DocumentServiceTest {
     @Mock
     private FileStorageService fileStorageService;
 
+    @Mock
+    private TeamRepository teamRepository;
+
+    @Mock
+    private DocumentShareRepository documentShareRepository;
+
     private DocumentService documentService;
 
     @BeforeEach
     void setUp() {
-        documentService = new DocumentService(documentStarService, documentRepository, fileStorageService);
+        documentService = new DocumentService(
+                documentStarService,
+                documentRepository,
+                fileStorageService,
+                teamRepository,
+                documentShareRepository
+        );
     }
 
     // ==================== STAR TESTS ====================

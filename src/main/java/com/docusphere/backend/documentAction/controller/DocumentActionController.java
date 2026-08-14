@@ -3,6 +3,7 @@ package com.docusphere.backend.documentAction.controller;
 import com.docusphere.backend.Common.exception.InvalidRequestException;
 import com.docusphere.backend.Common.response.ApiResponse;
 import com.docusphere.backend.authentication.service.JwtService;
+import com.docusphere.backend.document.util.DocumentMediaTypes;
 import com.docusphere.backend.documentAction.dto.DocumentActionResponse;
 import com.docusphere.backend.documentAction.dto.MoveRequest;
 import com.docusphere.backend.documentAction.dto.RenameRequest;
@@ -19,6 +20,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.util.UUID;
 
@@ -29,7 +31,8 @@ public class DocumentActionController {
 
     private final DocumentActionService service;
     private final JwtService jwtService;
-
+    @Value("${app.onlyoffice.jwt.secret:V8pX9iu5gDWzQrHP5Od62XOOiuOnlrtF}")
+    private String onlyofficeJwtSecret;
     public DocumentActionController(DocumentActionService service, JwtService jwtService) {
         this.service = service;
         this.jwtService = jwtService;
@@ -136,9 +139,9 @@ public class DocumentActionController {
         );
     }
 
-    @GetMapping("/{id}/download")
+    @GetMapping("/{documentId}/download")
     public ResponseEntity<Resource> download(
-            @PathVariable("id") UUID documentId,
+            @PathVariable UUID documentId,
             @RequestParam(value = "token", required = false) String shareToken,
             @RequestParam(value = "password", required = false) String password,
             @RequestHeader(value = "X-Document-Password", required = false) String passwordHeader,
@@ -147,8 +150,17 @@ public class DocumentActionController {
         String effectivePassword = resolvePassword(password, passwordHeader);
         Resource resource;
         String fileName;
+        String contentTypeHint = null;
 
-        if (shareToken != null && !shareToken.isBlank()) {
+        if (request.getParameter("dlToken") != null && !request.getParameter("dlToken").isBlank()) {
+            String dlToken = request.getParameter("dlToken");
+            resource = service.downloadByOnlyOfficeToken(documentId, dlToken, shareToken);
+            fileName = service.resolveDownloadFilenameByOnlyOfficeToken(documentId, dlToken, shareToken);
+            return ResponseEntity.ok()
+                    .contentType(DocumentMediaTypes.resolveContentType(fileName, contentTypeHint))
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + fileName + "\"")
+                    .body(resource);
+        } else if (shareToken != null && !shareToken.isBlank()) {
             resource = service.downloadByShareToken(documentId, shareToken, effectivePassword);
             fileName = service.resolveDownloadFilenameByShareToken(documentId, shareToken, effectivePassword);
         } else {
@@ -158,7 +170,7 @@ public class DocumentActionController {
         }
 
         return ResponseEntity.ok()
-                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .contentType(DocumentMediaTypes.resolveContentType(fileName, contentTypeHint))
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
                 .body(resource);
     }
@@ -200,5 +212,21 @@ public class DocumentActionController {
         }
 
         return null;
+    }
+    private boolean isOnlyOfficeRequest(HttpServletRequest request) {
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            String token = authHeader.substring(7);
+            try {
+                io.jsonwebtoken.Jwts.parser()
+                        .verifyWith(io.jsonwebtoken.security.Keys.hmacShaKeyFor(onlyofficeJwtSecret.getBytes(java.nio.charset.StandardCharsets.UTF_8)))
+                        .build()
+                        .parseSignedClaims(token);
+                return true;
+            } catch (Exception e) {
+                return false;
+            }
+        }
+        return false;
     }
 }

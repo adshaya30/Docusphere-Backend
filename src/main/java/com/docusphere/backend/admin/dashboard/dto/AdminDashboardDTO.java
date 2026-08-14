@@ -23,6 +23,10 @@ public class AdminDashboardDTO {
     private Double teamGrowth;
     private Double sessionGrowth;
     
+    // Storage metrics
+    private Long usedStorageBytes;
+    private Long storageQuotaBytes;
+    
     // Chart data
     private List<MonthlyUploadDTO> monthlyUploads;
     private List<TopTeamDTO> topTeams;

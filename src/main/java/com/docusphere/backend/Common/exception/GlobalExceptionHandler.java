@@ -3,8 +3,10 @@ package com.docusphere.backend.Common.exception;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -95,6 +97,11 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(HttpStatus.BAD_REQUEST, "MISSING_REQUEST_PARAMETER", message);
     }
 
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<Object> handleMethodNotSupported(HttpRequestMethodNotSupportedException ex) {
+        return buildErrorResponse(HttpStatus.METHOD_NOT_ALLOWED, "METHOD_NOT_ALLOWED", ex.getMessage());
+    }
+
     // Handle any other unexpected exceptions
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Object> handleGlobalException(Exception ex) {
@@ -109,7 +116,34 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(HttpStatus.BAD_REQUEST, "INVALID_ARGUMENT", ex.getMessage());
     }
 
+    @ExceptionHandler(InvalidRequestException.class)
+    public ResponseEntity<Object> handleInvalidRequest(InvalidRequestException ex) {
+        return buildErrorResponse(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", ex.getMessage());
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<Object> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
+        log.warn("Data integrity violation: {}", ex.getMessage());
+        return buildErrorResponse(HttpStatus.BAD_REQUEST, "DATA_INTEGRITY_VIOLATION",
+                "Could not save your comment. Please refresh the page and try again.");
+    }
+
+    @ExceptionHandler(DocumentNotFoundException.class)
+    public ResponseEntity<Object> handleDocumentNotFound(DocumentNotFoundException ex) {
+        return buildErrorResponse(HttpStatus.NOT_FOUND, "DOCUMENT_NOT_FOUND", ex.getMessage());
+    }
+
     // ACCESS 
+
+    @ExceptionHandler(ConflictException.class)
+    public ResponseEntity<Object> handleConflict(ConflictException ex) {
+        return buildErrorResponse(HttpStatus.CONFLICT, "DOCUMENT_NAME_CONFLICT", ex.getMessage());
+    }
+
+    @ExceptionHandler(AuthenticationRequiredException.class)
+    public ResponseEntity<Object> handleAuthenticationRequired(AuthenticationRequiredException ex) {
+        return buildErrorResponse(HttpStatus.UNAUTHORIZED, "AUTHENTICATION_REQUIRED", ex.getMessage());
+    }
 
     @ExceptionHandler(UnauthorizedAccessException.class)
     public ResponseEntity<Object> handleUnauthorizedAccess(UnauthorizedAccessException ex) {
