@@ -13,6 +13,7 @@ import com.docusphere.backend.authentication.entity.User;
 import com.docusphere.backend.authentication.repository.UserRepository;
 import com.docusphere.backend.authentication.service.EmailService;
 import com.docusphere.backend.Common.config.AppConfig;
+import com.docusphere.backend.Common.exception.ConflictException;
 import com.docusphere.backend.document.entity.Document;
 import com.docusphere.backend.document.repository.DocumentRepository;
 import com.docusphere.backend.document.storage.FileStorageService;
@@ -111,11 +112,19 @@ public class UserTeamService {
      */
     @Transactional
     public TeamDto createTeam(String name, String description, List<AddMemberRequest> initialMembers, Long leaderId) {
+        String normalizedName = name == null ? "" : name.trim();
+        if (normalizedName.isEmpty()) {
+            throw new IllegalArgumentException("Team name is required");
+        }
+        if (teamRepository.existsByTeamName(normalizedName)) {
+            throw new ConflictException("A team with this name already exists. Please try a different name.");
+        }
+
         User user = userRepository.findById(leaderId)
                 .orElseThrow(() -> new EntityNotFoundException("User not found: " + leaderId));
 
         Team team = new Team();
-        team.setTeamName(name);
+        team.setTeamName(normalizedName);
         team.setDescription(description);
         team.setMemberCount(1);
         team.setDocumentCount(0);
