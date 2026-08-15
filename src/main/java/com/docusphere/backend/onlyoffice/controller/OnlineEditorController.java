@@ -9,6 +9,8 @@ import com.docusphere.backend.document.repository.DocumentRepository;
 import com.docusphere.backend.document.storage.FileStorageService;
 import com.docusphere.backend.onlyoffice.dto.OnlyOfficeConfig;
 import com.docusphere.backend.onlyoffice.service.OnlyOfficeConfigBuilderService;
+import com.docusphere.backend.onlyoffice.service.OnlyOfficeDownloadTokenService;
+
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import jakarta.servlet.http.HttpServletRequest;
@@ -39,8 +41,9 @@ public class OnlineEditorController {
     private final FileStorageService fileStorageService;
     private final JwtService jwtService;
     private final OnlyOfficeConfigBuilderService configBuilderService;
+    private final OnlyOfficeDownloadTokenService downloadTokenService;
 
-    @Value("${jwt.secret}")
+    @Value("${app.onlyoffice.jwt.secret:V8pX9iu5gDWzQrHP5Od62XOOiuOnlrtF}")
     private String secretKey;
 
     @PostMapping("/create")
@@ -136,6 +139,7 @@ public class OnlineEditorController {
         }
 
         String callbackToken = generateCallbackToken(saved.getId(), requesterId);
+        String downloadToken = downloadTokenService.createDocumentDownloadToken(saved.getId(), requesterId, null);
 
         OnlyOfficeConfig editorConfig = configBuilderService.buildConfig(
                 saved,
@@ -144,7 +148,9 @@ public class OnlineEditorController {
                 canView,
                 canDownload,
                 docKey,
-                callbackToken
+                callbackToken,
+                downloadToken,
+                null
         );
 
         return ResponseEntity.ok(new CreateDocumentResponse(saved.getId(), editorConfig));
