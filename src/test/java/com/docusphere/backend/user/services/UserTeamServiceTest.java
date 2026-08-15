@@ -8,6 +8,7 @@ import com.docusphere.backend.document.repository.DocumentRepository;
 import com.docusphere.backend.document.storage.FileStorageService;
 import com.docusphere.backend.documentStar.repository.DocumentStarRepository;
 import com.docusphere.backend.team.entity.Team;
+import com.docusphere.backend.team.entity.TeamInvitation;
 import com.docusphere.backend.team.entity.TeamMember;
 import com.docusphere.backend.team.entity.TeamRole;
 import com.docusphere.backend.team.repository.TeamInvitationRepository;
@@ -28,7 +29,11 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import java.util.Optional;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import com.docusphere.backend.team.dto.AddMemberRequest;
+import com.docusphere.backend.team.dto.TeamDto;
+import com.docusphere.backend.team.dto.TransferLeaderRequest;
+
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -59,6 +64,77 @@ class UserTeamServiceTest {
         teamId = UUID.randomUUID();
         memberUserId = 2L;
         requesterId = 1L;
+    }
+
+    @Test
+    @DisplayName("createTeam fails when name is blank")
+    void createTeam_whenNameBlank_shouldThrowIllegalArgumentException() {
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
+                () -> userTeamService.createTeam("   ", "desc", null, requesterId));
+
+        assertEquals("Team name is required", exception.getMessage());
+        verify(teamRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("createTeam creates leader membership and returns DTO")
+    void createTeam_success_shouldCreateTeamAndLeaderMembership() {
+        User leader = new User();
+        leader.setId(requesterId);
+        leader.setFullName("Alice");
+
+        Team savedTeam = new Team();
+        savedTeam.setId(teamId);
+        savedTeam.setTeamName("Design Team");
+        savedTeam.setDescription("Product design");
+
+        when(teamRepository.existsByTeamName("Design Team")).thenReturn(false);
+        when(userRepository.findById(requesterId)).thenReturn(Optional.of(leader));
+        when(teamRepository.save(any(Team.class))).thenReturn(savedTeam);
+        when(teamService.toDto(savedTeam)).thenReturn(new TeamDto(teamId, "Design Team", "Product design", 1, 0, null, null));
+
+        TeamDto result = userTeamService.createTeam("Design Team", "Product design", null, requesterId);
+
+        assertNotNull(result);
+        assertEquals("Design Team", result.getName());
+        verify(teamMemberRepository).save(argThat(member ->
+                member.getUserId().equals(requesterId)
+                        && member.getRole() == TeamRole.LEADER
+                        && member.getTeam().getId().equals(teamId)
+        ));
+    }
+
+    @Test
+    @DisplayName("removeMember fails when requester is not LEADER")
+    void removeMember_whenRequesterNotLeader_shouldThrowIllegalStateException() {
+        when(teamService.isUserRoleInTeam(requesterId, teamId, TeamRole.LEADER)).thenReturn(false);
+
+        IllegalStateException exception = assertThrows(IllegalStateException.class,
+                () -> userTeamService.removeMember(teamId, memberUserId, requesterId));
+
+        assertEquals("Only the LEADER can remove members", exception.getMessage());
+    }
+
+    @Test
+    @DisplayName("removeMember succeeds and removes team membership")
+    void removeMember_success_shouldDeleteMembership() {
+        TeamMember membership = new TeamMember();
+        membership.setUserId(memberUserId);
+        membership.setFullName("Bob");
+        membership.setRole(TeamRole.MEMBER);
+
+        Team team = new Team();
+        team.setId(teamId);
+        team.setTeamName("Ops Team");
+
+        when(teamService.isUserRoleInTeam(requesterId, teamId, TeamRole.LEADER)).thenReturn(true);
+        when(teamMemberRepository.findByUserIdAndTeamId(memberUserId, teamId)).thenReturn(Optional.of(membership));
+        when(teamRepository.findById(teamId)).thenReturn(Optional.of(team));
+
+        userTeamService.removeMember(teamId, memberUserId, requesterId);
+
+        verify(teamMemberRepository).delete(membership);
+        verify(teamRepository).decrementMemberCount(teamId);
     }
 
     @Test
@@ -114,5 +190,37 @@ class UserTeamServiceTest {
             eq("/topic/teams/" + teamId + "/chat"),
             any(Object.class)
         );
+    }
+
+    @Test
+    @DisplayName("acceptInvitation adds a member when the invited email matches the user")
+    void acceptInvitation_success_shouldAddMemberToTeam() {
+        UUID invitationId = UUID.randomUUID();
+        TeamInvitation invitation = new TeamInvitation();
+        invitation.setId(invitationId);
+        invitation.setEmail("alice@example.com");
+        invitation.setTeamId(teamId);
+        invitation.setRole(TeamRole.MEMBER);
+        invitation.setInviterId(requesterId);
+
+        User user = new User();
+        user.setId(memberUserId);
+        user.setEmail("alice@example.com");
+        user.setFullName("Alice");
+
+        Team team = new Team();
+        team.setId(teamId);
+        team.setTeamName("Ops Team");
+
+        when(teamInvitationRepository.findById(invitationId)).thenReturn(Optional.of(invitation));
+        when(userRepository.findById(memberUserId)).thenReturn(Optional.of(user));
+        when(teamRepository.findById(teamId)).thenReturn(Optional.of(team));
+        when(teamMemberRepository.existsByUserIdAndTeamId(memberUserId, teamId)).thenReturn(false);
+
+        userTeamService.acceptInvitation(invitationId, memberUserId);
+
+        verify(teamMemberRepository).save(any(TeamMember.class));
+        verify(teamRepository).incrementMemberCount(teamId);
+        verify(teamInvitationRepository).delete(invitation);
     }
 }

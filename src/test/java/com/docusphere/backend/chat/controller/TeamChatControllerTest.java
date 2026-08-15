@@ -16,6 +16,7 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.Collections;
@@ -68,6 +69,12 @@ class TeamChatControllerTest {
         @Primary
         public SimpMessagingTemplate messagingTemplate() {
             return mock(SimpMessagingTemplate.class);
+        }
+
+        @Bean
+        @Primary
+        public UserDetailsService userDetailsService() {
+            return mock(UserDetailsService.class);
         }
     }
 
