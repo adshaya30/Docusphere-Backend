@@ -140,10 +140,6 @@ public class GlobalExceptionHandler {
 
     // ACCESS 
 
-    @ExceptionHandler(ConflictException.class)
-    public ResponseEntity<Object> handleConflict(ConflictException ex) {
-        return buildErrorResponse(HttpStatus.CONFLICT, "DOCUMENT_NAME_CONFLICT", ex.getMessage());
-    }
 
     @ExceptionHandler(AuthenticationRequiredException.class)
     public ResponseEntity<Object> handleAuthenticationRequired(AuthenticationRequiredException ex) {

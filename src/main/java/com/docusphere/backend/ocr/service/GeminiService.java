@@ -21,6 +21,9 @@ public class GeminiService {
     @Value("${gemini.api.key}")
     private String apiKey;
 
+    @Value("${gemini.model:gemini-3.5-flash}")
+    private String modelName;
+
     @Value("${gemini.timeout.connection:15000}")
     private int connectionTimeout;
 
@@ -39,7 +42,7 @@ public class GeminiService {
     }
 
     public AiAnalysisOutcome summarizeText(String cleanedText) {
-        log.info("Gemini Analysis started using model: gemini-2.5-flash");
+        log.info("Gemini Analysis started using model: {}", modelName);
         long startTime = System.currentTimeMillis();
 
         if (apiKey == null || apiKey.trim().isEmpty() || apiKey.startsWith("${")) {
@@ -107,7 +110,7 @@ public class GeminiService {
 
                 log.info("Sending request to Gemini API (Attempt {})...", attempt);
                 
-                String url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + apiKey;
+                String url = "https://generativelanguage.googleapis.com/v1beta/models/" + modelName + ":generateContent?key=" + apiKey;
                 
                 ResponseEntity<String> responseEntity = restTemplate.postForEntity(
                         url,
