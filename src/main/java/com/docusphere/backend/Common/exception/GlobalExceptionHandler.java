@@ -28,8 +28,16 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(ConflictException.class)
-    public ResponseEntity<Object> handleConflictException(ConflictException ex) {
-        return buildErrorResponse(HttpStatus.CONFLICT, "TEAM_ALREADY_EXISTS", ex.getMessage());
+    public ResponseEntity<Object> handleConflict(ConflictException ex) {
+        String errorCode = "CONFLICT";
+        if (ex.getMessage() != null) {
+            if (ex.getMessage().toLowerCase().contains("team")) {
+                errorCode = "TEAM_ALREADY_EXISTS";
+            } else if (ex.getMessage().toLowerCase().contains("document")) {
+                errorCode = "DOCUMENT_NAME_CONFLICT";
+            }
+        }
+        return buildErrorResponse(HttpStatus.CONFLICT, errorCode, ex.getMessage());
     }
 
     @ExceptionHandler(InvalidPasswordException.class)
@@ -140,10 +148,6 @@ public class GlobalExceptionHandler {
 
     // ACCESS 
 
-    @ExceptionHandler(ConflictException.class)
-    public ResponseEntity<Object> handleConflict(ConflictException ex) {
-        return buildErrorResponse(HttpStatus.CONFLICT, "DOCUMENT_NAME_CONFLICT", ex.getMessage());
-    }
 
     @ExceptionHandler(AuthenticationRequiredException.class)
     public ResponseEntity<Object> handleAuthenticationRequired(AuthenticationRequiredException ex) {

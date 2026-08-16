@@ -68,3 +68,7 @@ scratch/
 .env
 startup.log
 src/main/resources/docusphere-ocr-7af6c7033da4.json
+.m2-local/
+backend-live.log
+backend-live.log.*
+*.log

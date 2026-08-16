@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  onlyoffice:
+    image: onlyoffice/documentserver:latest
+    container_name: docusphere-onlyoffice
+    ports:
+      - "8081:80"
+    environment:
+      - JWT_ENABLED=true
+      - JWT_SECRET=V8pX9iu5gDWzQrHP5Od62XOOiuOnlrtF
+      - JWT_HEADER=Authorization
+    restart: always
