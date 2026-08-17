@@ -27,6 +27,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
 import java.time.Duration;
+import java.time.LocalDateTime;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -71,7 +72,8 @@ public class AuthController {
                 refreshToken,
                 user,
                 user.getRole().getName().replace("ROLE_", ""),
-                true
+                true,
+                jwtService.extractExpiration(refreshToken).getTime()
         );
     }
 
@@ -90,9 +92,22 @@ public class AuthController {
                 throw new BadCredentialsException("Email not verified. Please check your inbox for verification link.");
             }
 
+            // Check and auto-unlock if lock time has passed
+            if (user.getLockedUntil() != null) {
+                if (user.getLockedUntil().isBefore(LocalDateTime.now())) {
+                    // Time has passed → auto unlock
+                    userService.handleAutoUnlock(user);
+                } else {
+                    // Still locked
+                    throw new com.docusphere.backend.Common.exception.AccountLockedException("Account is locked. Try again in 15 minutes.", user.getLockedUntil());
+                }
+            }
+
             Authentication authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
             );
+
+            userService.handleSuccessfulLoginAttempt(user);
 
             UserDetails principal = (UserDetails) authentication.getPrincipal();
             String accessToken = jwtService.generateAccessToken(
@@ -108,7 +123,8 @@ public class AuthController {
                     refreshToken,
                     user,
                     user.getRole().getName().replace("ROLE_", ""),
-                    rememberMe
+                    rememberMe,
+                    jwtService.extractExpiration(refreshToken).getTime()
             );
         } catch (UserNotFoundException e) {
 
@@ -117,6 +133,20 @@ public class AuthController {
 
             if (e.getMessage().contains("Email not verified")) {
                 throw e;
+            }
+
+            if (e.getMessage() != null && e.getMessage().contains("temporarily locked")) {
+                throw e;
+            }
+
+            try {
+                User user = userService.findByEmail(request.getEmail());
+                boolean lockedNow = userService.handleFailedLoginAttempt(user);
+                if (lockedNow) {
+                    throw new com.docusphere.backend.Common.exception.AccountLockedException("Account is temporarily locked due to multiple failed login attempts. Please try again later or reset your password.", user.getLockedUntil());
+                }
+            } catch (UserNotFoundException ignored) {
+                // ignore missing users
             }
 
             throw new BadCredentialsException("Invalid email or password. Please try again.");
@@ -142,7 +172,8 @@ public class AuthController {
                 refreshToken,
                 user,
                 user.getRole().getName().replace("ROLE_", ""),
-                true
+            true,
+            jwtService.extractExpiration(refreshToken).getTime()
         );
     }
 
@@ -183,7 +214,8 @@ public class AuthController {
                 refreshToken,
                 user,
                 user.getRole().getName().replace("ROLE_", ""),
-                rememberMe
+            rememberMe,
+            jwtService.extractExpiration(refreshToken).getTime()
         );
     }
 
@@ -284,7 +316,7 @@ public ResponseEntity<User> updateProfile(
     return ResponseEntity.ok(updatedUser);
 }
 
-    private ResponseEntity<AuthResponse> withAuthCookies(String accessToken, String refreshToken, User user, String role, boolean rememberMe) {
+    private ResponseEntity<AuthResponse> withAuthCookies(String accessToken, String refreshToken, User user, String role, boolean rememberMe, Long refreshTokenExpiry) {
         HttpHeaders headers = new HttpHeaders();
         headers.add(HttpHeaders.SET_COOKIE, createCookie(ACCESS_TOKEN_COOKIE, accessToken, "/", Duration.ofMillis(accessTokenCookieMaxAge)).toString());
         headers.add(HttpHeaders.SET_COOKIE, rememberMe
@@ -296,6 +328,8 @@ public ResponseEntity<User> updateProfile(
                 .body(new AuthResponse(
                         accessToken,
                         refreshToken,
+                    refreshTokenExpiry,
+                    rememberMe,
                         role,
                         user.getFullName(),
                         user.getEmail(),

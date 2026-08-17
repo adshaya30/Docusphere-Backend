@@ -7,6 +7,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.scheduling.annotation.Scheduled;
 
 import com.docusphere.backend.Common.config.AdminConfig;
 import com.docusphere.backend.Common.config.AppConfig;
@@ -250,6 +251,76 @@ public class UserService {
         }).start();
     }
 
+
+
+    @Transactional
+    public boolean handleFailedLoginAttempt(User user) {
+        if (user == null) {
+            return false;
+        }
+
+        // If already locked, just return true
+        if (user.isAccountLocked()) {
+            return true;
+        }
+
+        user.setFailedLoginAttempts(user.getFailedLoginAttempts() + 1);
+
+        if (user.getFailedLoginAttempts() >= 3) {
+            // Lock for 15 mins + alert email
+            user.setAccountLocked(true);
+            user.setLockedUntil(LocalDateTime.now().plusMinutes(15));
+            userRepository.save(user);
+            sendSecurityAlertAsync(user);
+            return true;   // Account is now locked
+        }
+
+        userRepository.save(user);
+        return false;  // Still allowed to try
+    }
+
+    @Transactional
+    public void handleSuccessfulLoginAttempt(User user) {
+        if (user == null) {
+            return;
+        }
+
+        user.setFailedLoginAttempts(0);
+        user.setAccountLocked(false);
+        user.setLockedUntil(null);
+        userRepository.save(user);
+    }
+
+    @Transactional
+    public void handleAutoUnlock(User user) {
+        if (user == null) {
+            return;
+        }
+        user.setAccountLocked(false);
+        user.setLockedUntil(null);
+        user.setFailedLoginAttempts(0);
+        userRepository.save(user);
+    }
+
+    @Scheduled(fixedRate = 60000) // Runs every 60 seconds
+    @Transactional
+    public void unlockExpiredAccountsAutomatically() {
+        int unlockedCount = userRepository.unlockExpiredAccounts(LocalDateTime.now());
+        if (unlockedCount > 0) {
+            log.info("Automatically unlocked " + unlockedCount + " expired accounts in the database.");
+        }
+    }
+
+    public void sendSecurityAlertAsync(User user) {
+        new Thread(() -> {
+            try {
+                emailService.sendSecurityAlertEmail(user.getEmail(), user.getFullName(), "We detected multiple failed login attempts on your DocuSphere account. If this was not you, we strongly recommend resetting your password immediately to secure your account.<br><br>If this was you, your account will be automatically unlocked after 15 minutes.");
+            } catch (Exception e) {
+                log.warn("Failed to send security alert email to {}", user.getEmail(), e);
+            }
+        }).start();
+    }
+
     @Transactional
     public void resetPassword(ResetPasswordRequest request) {
         if (!request.getNewPassword().equals(request.getConfirmPassword())) {
@@ -277,6 +348,9 @@ public class UserService {
 
         // Update password
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        user.setFailedLoginAttempts(0);
+        user.setAccountLocked(false);
+        user.setLockedUntil(null);
         userRepository.save(user);
         passwordResetTokenRepository.delete(resetToken);
     }

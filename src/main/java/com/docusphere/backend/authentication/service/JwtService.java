@@ -42,7 +42,10 @@ public class JwtService {
         return buildToken(userDetails, role, userId, accessTokenExpiration);
     }
 
-    // Generate Refresh Token (long lived)
+    public String generateRefreshToken(UserDetails userDetails, boolean rememberMe) {
+        return generateRefreshToken(userDetails, null, rememberMe);
+    }
+
     public String generateRefreshToken(UserDetails userDetails) {
         return generateRefreshToken(userDetails, null, true);
     }
@@ -114,6 +117,10 @@ public class JwtService {
     }
 
     public boolean extractRememberMe(String token) {
+        return extractIsRememberMe(token);
+    }
+
+    public boolean extractIsRememberMe(String token) {
         Boolean rememberMe = Jwts.parser()
                 .verifyWith(getSigningKey())
                 .build()

@@ -58,6 +58,25 @@ public class EmailService {
         mailSender.send(message);
     }
 
+
+
+    public void sendSecurityAlertEmail(String to, String fullName, String messageText) throws MessagingException {
+        MimeMessage message = mailSender.createMimeMessage();
+        MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+        helper.setTo(to);
+        helper.setSubject("Security Alert - Multiple failed login attempts");
+
+        Context context = new Context();
+        context.setVariable("userName", fullName);
+        context.setVariable("messageText", messageText);
+
+        String htmlContent = templateEngine.process("security-alert-email", context);
+
+        helper.setText(htmlContent, true);
+        mailSender.send(message);
+    }
+
     // Send Team Invitation Email
     public void sendTeamInvitationEmail(String to, String teamName, String inviterName, String link) throws MessagingException {
         MimeMessage message = mailSender.createMimeMessage();
