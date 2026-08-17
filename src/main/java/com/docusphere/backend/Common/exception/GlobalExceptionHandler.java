@@ -27,18 +27,10 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(HttpStatus.CONFLICT, "EMAIL_ALREADY_EXISTS", ex.getMessage());
     }
 
-    @ExceptionHandler(ConflictException.class)
-    public ResponseEntity<Object> handleConflict(ConflictException ex) {
-        String errorCode = "CONFLICT";
-        if (ex.getMessage() != null) {
-            if (ex.getMessage().toLowerCase().contains("team")) {
-                errorCode = "TEAM_ALREADY_EXISTS";
-            } else if (ex.getMessage().toLowerCase().contains("document")) {
-                errorCode = "DOCUMENT_NAME_CONFLICT";
-            }
-        }
-        return buildErrorResponse(HttpStatus.CONFLICT, errorCode, ex.getMessage());
-    }
+    @ExceptionHandler(TeamAlreadyExistsException.class)
+    public ResponseEntity<Object> handleTeamAlreadyExists(TeamAlreadyExistsException ex) {
+        return buildErrorResponse(HttpStatus.CONFLICT,"TEAM_ALREADY_EXISTS",ex.getMessage());
+   }
 
     @ExceptionHandler(InvalidPasswordException.class)
     public ResponseEntity<Object> handleInvalidPassword(InvalidPasswordException ex) {

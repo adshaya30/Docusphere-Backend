@@ -15,6 +15,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.UUID;
@@ -34,11 +35,14 @@ class UserTeamControllerTest {
     private UserTeamService userTeamService;
 
     @Autowired
+    private TeamService teamService;
+
+    @Autowired
     private JwtService jwtService;
 
     @AfterEach
     void resetMocks() {
-        reset(userTeamService, jwtService);
+        reset(userTeamService, teamService, jwtService);
     }
 
     @TestConfiguration
@@ -66,6 +70,12 @@ class UserTeamControllerTest {
         public JwtService jwtService() {
             return mock(JwtService.class);
         }
+
+        @Bean
+        @Primary
+        public UserDetailsService userDetailsService() {
+            return mock(UserDetailsService.class);
+        }
     }
 
     @Test
@@ -77,6 +87,7 @@ class UserTeamControllerTest {
         Long requesterId = 1L;
 
         when(jwtService.extractUserId(token)).thenReturn(requesterId);
+        when(teamService.isUserInTeam(requesterId, teamId)).thenReturn(true);
 
         mockMvc.perform(put("/api/teams/" + teamId + "/members/" + memberId + "/chat-block")
                         .header("Authorization", "Bearer " + token)
