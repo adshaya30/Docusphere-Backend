@@ -229,6 +229,63 @@ class UserServiceTest {
     }
 
     @Test
+    @DisplayName("handleFailedLoginAttempt locks the account at the third failed attempt")
+    void handleFailedLoginAttempt_whenThresholdReached_shouldLockAccountAndSendAlert() throws Exception {
+        User user = user("user@example.com", "encoded", true, role("ROLE_USER"));
+        user.setFailedLoginAttempts(2);
+
+        boolean locked = userService.handleFailedLoginAttempt(user);
+
+        assertTrue(locked);
+        assertEquals(3, user.getFailedLoginAttempts());
+        assertTrue(user.isAccountLocked());
+        assertNotNull(user.getLockedUntil());
+        verify(userRepository, times(1)).save(user);
+        verify(emailService, times(1)).sendSecurityAlertEmail(eq("user@example.com"), eq("Test User"), contains("We detected multiple failed login attempts"));
+    }
+
+    @Test
+    @DisplayName("handleSuccessfulLoginAttempt resets failed attempts and clears the lock")
+    void handleSuccessfulLoginAttempt_shouldResetAttemptsAndClearLock() {
+        User user = user("user@example.com", "encoded", true, role("ROLE_USER"));
+        user.setFailedLoginAttempts(3);
+        user.setLockedUntil(LocalDateTime.now().plusMinutes(10));
+
+        userService.handleSuccessfulLoginAttempt(user);
+
+        assertEquals(0, user.getFailedLoginAttempts());
+        assertFalse(user.isAccountLocked());
+        assertEquals(null, user.getLockedUntil());
+        verify(userRepository, times(1)).save(user);
+    }
+
+    @Test
+    @DisplayName("handleAutoUnlock successfully unlocks user")
+    void handleAutoUnlock_shouldUnlockUserAndResetAttempts() {
+        User user = user("user@example.com", "encoded", true, role("ROLE_USER"));
+        user.setAccountLocked(true);
+        user.setLockedUntil(LocalDateTime.now().minusMinutes(5));
+        user.setFailedLoginAttempts(3);
+
+        userService.handleAutoUnlock(user);
+
+        assertFalse(user.isAccountLocked());
+        assertEquals(0, user.getFailedLoginAttempts());
+        assertEquals(null, user.getLockedUntil());
+        verify(userRepository, times(1)).save(user);
+    }
+
+    @Test
+    @DisplayName("unlockExpiredAccountsAutomatically triggers scheduled job")
+    void unlockExpiredAccountsAutomatically_shouldTriggerRepositoryMethod() {
+        when(userRepository.unlockExpiredAccounts(any(LocalDateTime.class))).thenReturn(1);
+
+        userService.unlockExpiredAccountsAutomatically();
+
+        verify(userRepository, times(1)).unlockExpiredAccounts(any(LocalDateTime.class));
+    }
+
+    @Test
     @DisplayName("forgotPassword throws when user does not exist")
     void forgotPassword_whenUserNotFound_shouldThrowUserNotFoundException() {
         when(userRepository.findByEmail("missing@example.com")).thenReturn(Optional.empty());

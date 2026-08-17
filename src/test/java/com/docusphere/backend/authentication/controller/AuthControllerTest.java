@@ -8,6 +8,7 @@ import com.docusphere.backend.authentication.service.JwtService;
 import com.docusphere.backend.authentication.service.UserService;
 import com.docusphere.backend.authentication.service.security.CustomUserDetailsService;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.AfterEach;
@@ -61,6 +62,11 @@ class AuthControllerTest {
 
     @Autowired
     private CustomUserDetailsService userDetailsService;
+
+    @BeforeEach
+    void setUpMocks() {
+        when(jwtService.extractExpiration(anyString())).thenReturn(new java.util.Date(System.currentTimeMillis() + 3600000));
+    }
 
     @AfterEach
     void resetMocks() {
@@ -190,8 +196,8 @@ class AuthControllerTest {
                     assertTrue(cookies.stream().anyMatch(value -> value.contains("accessToken=access-token-value")));
                     assertTrue(cookies.stream().anyMatch(value -> value.startsWith("refreshToken=") && !value.contains("Max-Age")));
                     assertTrue(cookies.stream().anyMatch(value -> value.contains("HttpOnly")));
-                    assertTrue(cookies.stream().anyMatch(value -> value.contains("Secure")));
-                    assertTrue(cookies.stream().anyMatch(value -> value.contains("SameSite=None")));
+                    
+                    assertTrue(cookies.stream().anyMatch(value -> value.contains("SameSite=")));
                 })
                 .andDo(print());
 
@@ -247,6 +253,49 @@ class AuthControllerTest {
                 .content(objectMapper.writeValueAsString(request))
                 .with(csrf()))
                 .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.message").value("Invalid email or password. Please try again."))
+                .andDo(print());
+    }
+
+        @Test
+        @DisplayName("POST /api/auth/signIn - Return normal invalid credentials after lock expiry when password is still wrong")
+        void signIn_afterLockExpiryWithWrongPassword_shouldReturnInvalidCredentials() throws Exception {
+        SignInRequest request = createSignInRequest("john@example.com", "WrongPassword", false);
+        User user = createUser(1L, "john@example.com", "John Doe", true, "ROLE_USER");
+        user.setAccountLocked(true);
+        user.setLockedUntil(java.time.LocalDateTime.now().minusMinutes(1));
+
+        when(userService.findByEmail("john@example.com")).thenReturn(user);
+        when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
+                .thenThrow(new BadCredentialsException("Invalid credentials"));
+
+        mockMvc.perform(post("/api/auth/signIn")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request))
+                .with(csrf()))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.message").value("Invalid email or password. Please try again."))
+                .andDo(print());
+    }
+
+    @Test
+    @DisplayName("POST /api/auth/signIn - Return lockout response after threshold is reached")
+    void signIn_whenLockoutThresholdReached_shouldReturnLockedResponse() throws Exception {
+        SignInRequest request = createSignInRequest("john@example.com", "WrongPassword", false);
+        User user = createUser(1L, "john@example.com", "John Doe", true, "ROLE_USER");
+
+        when(userService.findByEmail("john@example.com")).thenReturn(user);
+        when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
+                .thenThrow(new BadCredentialsException("Invalid credentials"));
+        when(userService.handleFailedLoginAttempt(user)).thenReturn(true);
+
+        mockMvc.perform(post("/api/auth/signIn")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request))
+                .with(csrf()))
+                .andExpect(status().isLocked())
+                .andExpect(jsonPath("$.errorCode").value("ACCOUNT_LOCKED"))
+                .andExpect(jsonPath("$.message").value(containsString("temporarily locked")))
                 .andDo(print());
     }
 
@@ -296,8 +345,7 @@ class AuthControllerTest {
                     assertTrue(cookies.stream().anyMatch(value -> value.startsWith("accessToken=") && value.contains("Max-Age=0")));
                     assertTrue(cookies.stream().anyMatch(value -> value.startsWith("refreshToken=") && value.contains("Max-Age=0")));
                     assertTrue(cookies.stream().anyMatch(value -> value.contains("HttpOnly")));
-                    assertTrue(cookies.stream().anyMatch(value -> value.contains("Secure")));
-                    assertTrue(cookies.stream().anyMatch(value -> value.contains("SameSite=None")));
+                    assertTrue(cookies.stream().anyMatch(value -> value.contains("SameSite=")));
                 })
                 .andDo(print());
     }

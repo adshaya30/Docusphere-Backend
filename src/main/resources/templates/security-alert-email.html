@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Security Alert - DocuSphere</title>
+</head>
+<body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #ffffff; margin: 0; padding: 0; color: #333;">
+  <div style="padding: 40px 30px; text-align: center;">
+    <div style="font-size: 32px; font-weight: 700; color: #114692; margin: 0; letter-spacing: 0.5px;">Security Alert</div>
+  </div>
+
+  <div style="padding: 50px 45px; text-align: center;">
+    <div style="font-size: 24px; font-weight: 700; margin-bottom: 20px; color: #05152C; letter-spacing: 0.2px;">Hi <span th:utext="${userName}"></span>,</div>
+
+    <div style="font-size: 16px; line-height: 1.8; color: #555; margin-bottom: 40px; font-weight: 500;" th:utext="${messageText}">
+    </div>
+
+    <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #e0e0e0;">
+      <div style="font-size: 14px; color: #999; margin: 15px 0;">
+        For your security, your account may be temporarily locked after repeated failed login attempts.
+      </div>
+      <div style="font-size: 14px; color: #999; margin: 15px 0;">
+        Thanks,<br>
+        DocuSphere Security
+      </div>
+    </div>
+  </div>
+</body>
+</html>

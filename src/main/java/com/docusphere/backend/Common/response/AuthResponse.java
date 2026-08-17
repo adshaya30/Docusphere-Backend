@@ -6,6 +6,8 @@ import lombok.*;
 public class AuthResponse {
     private String accessToken;
     private String refreshToken;
+    private Long refreshTokenExpiry;
+    private boolean rememberMe;
     private String role;
     private String fullName;
     private String email;

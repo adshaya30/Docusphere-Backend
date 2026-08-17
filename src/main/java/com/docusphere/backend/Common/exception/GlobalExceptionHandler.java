@@ -59,9 +59,22 @@ public class GlobalExceptionHandler {
         if (ex.getMessage() != null && ex.getMessage().contains("Email not verified")) {
             return buildErrorResponse(HttpStatus.UNAUTHORIZED, "EMAIL_NOT_VERIFIED", ex.getMessage());
         }
-
         return buildErrorResponse(HttpStatus.UNAUTHORIZED, "INVALID_CREDENTIALS",
                 "Invalid email or password. Please try again.");
+    }
+
+    @ExceptionHandler(com.docusphere.backend.Common.exception.AccountLockedException.class)
+    public ResponseEntity<Object> handleAccountLocked(com.docusphere.backend.Common.exception.AccountLockedException ex) {
+        Map<String, Object> errorResponse = new HashMap<>();
+        errorResponse.put("timestamp", LocalDateTime.now());
+        errorResponse.put("status", HttpStatus.LOCKED.value());
+        errorResponse.put("error", HttpStatus.LOCKED.getReasonPhrase());
+        errorResponse.put("errorCode", "ACCOUNT_LOCKED");
+        errorResponse.put("message", ex.getMessage());
+        if (ex.getLockedUntil() != null) {
+            errorResponse.put("lockedUntil", ex.getLockedUntil().toString());
+        }
+        return new ResponseEntity<>(errorResponse, HttpStatus.LOCKED);
     }
 
     @ExceptionHandler(AuthenticationException.class)
