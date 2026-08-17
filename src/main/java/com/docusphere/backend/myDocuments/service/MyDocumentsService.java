@@ -60,7 +60,7 @@ public class MyDocumentsService {
             spec = spec.and(MyDocumentsSpecifications.hasTeamId(teamId));
         }
 
-        if (type != null) {
+        if (type != null && !type.isBlank()) {
             spec = spec.and(MyDocumentsSpecifications.hasType(type));
         }
 

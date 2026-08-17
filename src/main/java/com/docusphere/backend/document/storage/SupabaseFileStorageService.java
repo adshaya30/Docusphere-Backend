@@ -1,9 +1,11 @@
 package com.docusphere.backend.document.storage;
 import com.docusphere.backend.Common.exception.FileUploadException;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 import java.io.File;
 
@@ -12,6 +14,7 @@ import java.io.File;
  * Consolidates upload, download, copy, and delete operations.
  * Replaces duplicate SupabaseStorageService class.
  */
+@Slf4j
 @Service
 public class SupabaseFileStorageService implements FileStorageService {
 
@@ -41,15 +44,23 @@ public class SupabaseFileStorageService implements FileStorageService {
         HttpHeaders headers = buildAuthHeaders();
         HttpEntity<Void> request = new HttpEntity<>(headers);
 
-        ResponseEntity<String> response = restTemplate.exchange(
-                url,
-                HttpMethod.DELETE,
-                request,
-                String.class
-        );
+        try {
+            ResponseEntity<String> response = restTemplate.exchange(
+                    url,
+                    HttpMethod.DELETE,
+                    request,
+                    String.class
+            );
 
-        if (!response.getStatusCode().is2xxSuccessful()) {
-            throw new FileUploadException("Failed to delete file from storage: " + path);
+            if (!response.getStatusCode().is2xxSuccessful()) {
+                throw new FileUploadException("Failed to delete file from storage: " + path);
+            }
+        } catch (HttpClientErrorException ex) {
+            if (isMissingObject(ex)) {
+                log.warn("Storage object already missing while deleting {}: {}", path, ex.getMessage());
+                return;
+            }
+            throw new FileUploadException("Failed to delete file from storage: " + path, ex);
         }
     }
 
@@ -150,5 +161,30 @@ public class SupabaseFileStorageService implements FileStorageService {
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(serviceKey);
         return headers;
+    }
+
+    /**
+     * Supabase may return HTTP 404, or HTTP 400 with a body like
+     * {@code {"statusCode":"404","error":"not_found","code":"NoSuchKey"}}.
+     */
+    private boolean isMissingObject(HttpClientErrorException ex) {
+        if (ex.getStatusCode() == HttpStatus.NOT_FOUND) {
+            return true;
+        }
+
+        String body = ex.getResponseBodyAsString();
+        if (body == null || body.isBlank()) {
+            body = ex.getMessage();
+        }
+        if (body == null) {
+            return false;
+        }
+
+        String normalized = body.toLowerCase();
+        return normalized.contains("\"nosuchkey\"")
+                || normalized.contains("nosuchkey")
+                || normalized.contains("\"not_found\"")
+                || normalized.contains("object not found")
+                || normalized.contains("\"statuscode\":\"404\"");
     }
 }

@@ -8,6 +8,7 @@ import com.docusphere.backend.comment.entity.Comment;
 import com.docusphere.backend.comment.repository.CommentRepository;
 import com.docusphere.backend.documentShare.dto.CreateShareLinkRequest;
 import com.docusphere.backend.documentShare.dto.CreateShareLinkResponse;
+import com.docusphere.backend.documentShare.dto.DocumentShareListItemResponse;
 import com.docusphere.backend.documentShare.dto.ShareCommentRequest;
 import com.docusphere.backend.documentShare.dto.SharedDocumentResponse;
 import com.docusphere.backend.documentShare.service.DocumentSharingService;
@@ -56,6 +57,16 @@ public class DocumentSharingController {
         Long requesterId = extractRequesterId(httpRequest);
         CreateShareLinkResponse response = documentSharingService.createShareLink(requesterId, documentId, request);
         return ResponseEntity.ok(ApiResponse.success("Share link created successfully", response));
+    }
+
+    @GetMapping("/api/documents/{id}/shares")
+    public ResponseEntity<ApiResponse<List<DocumentShareListItemResponse>>> listShareLinks(
+            @PathVariable("id") UUID documentId,
+            HttpServletRequest httpRequest
+    ) {
+        Long requesterId = extractRequesterId(httpRequest);
+        List<DocumentShareListItemResponse> shares = documentSharingService.listActiveShareLinks(requesterId, documentId);
+        return ResponseEntity.ok(ApiResponse.success("Active share links fetched successfully", shares));
     }
 
     @DeleteMapping("/api/documents/{id}/share")
