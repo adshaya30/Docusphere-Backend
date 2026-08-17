@@ -21,6 +21,8 @@ public class AdminMemberView {
     public UUID getMembershipId() { return membershipId; }
     public void setMembershipId(UUID membershipId) { this.membershipId = membershipId; }
 
+    public UUID getId() { return membershipId; }
+    
     public Long getUserId() { return userId; }
     public void setUserId(Long userId) { this.userId = userId; }
 
