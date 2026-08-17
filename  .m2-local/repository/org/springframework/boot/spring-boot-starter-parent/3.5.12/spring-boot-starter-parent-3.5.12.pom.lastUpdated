@@ -1,0 +1,4 @@
+#NOTE: This is a Maven Resolver internal implementation file, its format can be changed without prior notice.
+#Sat Aug 15 07:30:05 IST 2026
+@default-central-https\://repo.maven.apache.org/maven2/.lastUpdated=1786759205351
+https\://repo.maven.apache.org/maven2/.error=Could not transfer artifact org.springframework.boot\:spring-boot-starter-parent\:pom\:3.5.12 from/to central (https\://repo.maven.apache.org/maven2)\: No such host is known (repo.maven.apache.org)
