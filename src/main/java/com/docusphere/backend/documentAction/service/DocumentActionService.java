@@ -24,9 +24,15 @@ public interface DocumentActionService {
 
     Resource download(Long requesterId, UUID documentId, String password);
 
+    Resource downloadForSystem(UUID documentId);
+
     String resolveDownloadFilename(Long requesterId, UUID documentId, String password);
 
     Resource downloadByShareToken(UUID documentId, String token, String password);
 
     String resolveDownloadFilenameByShareToken(UUID documentId, String token, String password);
+
+    Resource downloadByOnlyOfficeToken(UUID documentId, String dlToken, String urlShareToken);
+
+    String resolveDownloadFilenameByOnlyOfficeToken(UUID documentId, String dlToken, String urlShareToken);
 }

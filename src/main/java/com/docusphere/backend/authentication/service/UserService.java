@@ -1,32 +1,39 @@
 package com.docusphere.backend.authentication.service;
 
-import com.docusphere.backend.Common.config.AdminConfig;
-import com.docusphere.backend.Common.config.AppConfig;
-import com.docusphere.backend.authentication.dto.SignUpRequest;
-import com.docusphere.backend.authentication.dto.ResetPasswordRequest;
-import com.docusphere.backend.authentication.dto.UpdateProfileRequest;
-import com.docusphere.backend.authentication.dto.ChangePasswordRequest;
-import com.docusphere.backend.authentication.entity.Role;
-import com.docusphere.backend.authentication.entity.User;
-import com.docusphere.backend.authentication.entity.VerificationToken;
-import com.docusphere.backend.authentication.entity.PasswordResetToken;
-import com.docusphere.backend.Common.exception.*;
-import com.docusphere.backend.Common.exception.EmailNotVerifiedException;
-import com.docusphere.backend.authentication.repository.PasswordResetTokenRepository;
-import com.docusphere.backend.authentication.repository.RoleRepository;
-import com.docusphere.backend.authentication.repository.UserRepository;
-import com.docusphere.backend.authentication.repository.VerificationTokenRepository;
-import jakarta.mail.MessagingException;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import java.time.LocalDateTime;
+import java.util.UUID;
+
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.scheduling.annotation.Scheduled;
 
-import java.time.LocalDateTime;
-import java.util.UUID;
+import com.docusphere.backend.Common.config.AdminConfig;
+import com.docusphere.backend.Common.config.AppConfig;
+import com.docusphere.backend.Common.exception.EmailAlreadyExistsException;
+import com.docusphere.backend.Common.exception.EmailNotVerifiedException;
+import com.docusphere.backend.Common.exception.InvalidPasswordException;
+import com.docusphere.backend.Common.exception.InvalidRequestException;
+import com.docusphere.backend.Common.exception.InvalidTokenException;
+import com.docusphere.backend.Common.exception.TokenExpiredException;
+import com.docusphere.backend.Common.exception.UserNotFoundException;
+import com.docusphere.backend.authentication.dto.ChangePasswordRequest;
+import com.docusphere.backend.authentication.dto.ResetPasswordRequest;
+import com.docusphere.backend.authentication.dto.SignUpRequest;
+import com.docusphere.backend.authentication.dto.UpdateProfileRequest;
+import com.docusphere.backend.authentication.entity.PasswordResetToken;
+import com.docusphere.backend.authentication.entity.Role;
+import com.docusphere.backend.authentication.entity.User;
+import com.docusphere.backend.authentication.entity.VerificationToken;
+import com.docusphere.backend.authentication.repository.PasswordResetTokenRepository;
+import com.docusphere.backend.authentication.repository.RoleRepository;
+import com.docusphere.backend.authentication.repository.UserRepository;
+import com.docusphere.backend.authentication.repository.VerificationTokenRepository;
+
+import jakarta.mail.MessagingException;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
 @RequiredArgsConstructor
@@ -42,6 +49,7 @@ public class UserService {
     private final AppConfig appConfig;
     private final EmailService emailService;
     private final SupabaseProfileStorageService supabaseProfileStorageService;
+    private final com.docusphere.backend.user.services.UserTeamService userTeamService;
 
     @Transactional
     public void signUp(SignUpRequest dto) {
@@ -99,9 +107,7 @@ public class UserService {
 
         if (existingUser.isPresent()) {
             User user = existingUser.get();
-        
             user.setFullName(resolvedFullName);
-        
             return userRepository.save(user);
         }
 
@@ -162,6 +168,13 @@ public class UserService {
         user.setEnabled(true);
         userRepository.save(user);
         tokenRepository.delete(vt);
+
+        // After enabling the user, link any pending team invitations to this account
+        try {
+            userTeamService.processPendingInvitations(user.getId());
+        } catch (Exception ignored) {
+        }
+        
         return user;
     }
 

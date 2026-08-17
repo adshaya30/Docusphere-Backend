@@ -26,8 +26,49 @@ target/
 /nbdist/
 /.nb-gradle/
 build/
+HELP.md
+target/
+.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
 !**/src/main/**/build/
 !**/src/test/**/build/
 
 ### VS Code ###
 .vscode/
+
+venv/
+backend.log
+build_output.log
+docusphere.db
+scratch/
+.env
+startup.log
+src/main/resources/docusphere-ocr-7af6c7033da4.json
+.m2-local/
+backend-live.log
+backend-live.log.*
+*.log

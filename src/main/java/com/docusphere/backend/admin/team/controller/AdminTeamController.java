@@ -9,12 +9,11 @@ import com.docusphere.backend.team.dto.TeamDto;
 import com.docusphere.backend.team.dto.TransferLeaderRequest;
 import com.docusphere.backend.team.entity.Team;
 import com.docusphere.backend.team.service.TeamService;
-import com.docusphere.backend.authentication.service.JwtService;
 import jakarta.validation.Valid;
-import org.springframework.core.io.Resource;
-import org.springframework.http.HttpHeaders;
+
+
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -33,22 +32,18 @@ public class AdminTeamController {
     private final AdminTeamMergeService mergeService;
     private final AdminTeamDocumentService documentService;
     private final TeamService teamService;
-    private final JwtService jwtService;
-
     public AdminTeamController(AdminTeamCoreService coreService,
             AdminTeamQueryService queryService,
             AdminTeamMemberService memberService,
             AdminTeamMergeService mergeService,
             AdminTeamDocumentService documentService,
-            TeamService teamService,
-            JwtService jwtService) {
+            TeamService teamService) {
         this.coreService = coreService;
         this.queryService = queryService;
         this.memberService = memberService;
         this.mergeService = mergeService;
         this.documentService = documentService;
         this.teamService = teamService;
-        this.jwtService = jwtService;
     }
 
     @GetMapping
@@ -126,5 +121,5 @@ public class AdminTeamController {
                 request.isMoveDocuments());
         return ResponseEntity.ok(teamService.toDto(mergedTeam));
     }
-         
+
 }

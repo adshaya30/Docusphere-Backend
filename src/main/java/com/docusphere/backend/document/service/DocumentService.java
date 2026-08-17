@@ -10,6 +10,8 @@ import com.docusphere.backend.Common.exception.DocumentNotFoundException;
 import com.docusphere.backend.document.entity.Document;
 import com.docusphere.backend.document.repository.DocumentRepository;
 import com.docusphere.backend.document.storage.FileStorageService;
+import com.docusphere.backend.team.repository.TeamRepository;
+import com.docusphere.backend.documentShare.repository.DocumentShareRepository;
 
 import java.util.UUID;
 import java.util.List;
@@ -20,14 +22,20 @@ public class DocumentService {
     private final DocumentStarService documentStarService;
     private final DocumentRepository documentRepository;
     private final FileStorageService fileStorageService;
+    private final TeamRepository teamRepository;
+    private final DocumentShareRepository documentShareRepository;
 
 
     public DocumentService(DocumentStarService documentStarService,
                            DocumentRepository documentRepository,
-                           FileStorageService fileStorageService) {
+                           FileStorageService fileStorageService,
+                           TeamRepository teamRepository,
+                           DocumentShareRepository documentShareRepository) {
         this.documentStarService = documentStarService;
         this.documentRepository = documentRepository;
         this.fileStorageService = fileStorageService;
+        this.teamRepository = teamRepository;
+        this.documentShareRepository = documentShareRepository;
     }
     @Transactional
     public DocumentStarResponse star(String userId, String documentId) {
@@ -67,6 +75,10 @@ public class DocumentService {
     public void deleteById(UUID documentId) {
         Document document = documentRepository.findById(documentId)
                 .orElseThrow(() -> new DocumentNotFoundException("Document not found"));
+        UUID teamId = document.getTeamId();
+
+        // Delete share links first to prevent foreign key constraint violations
+        documentShareRepository.deleteByDocumentId(documentId);
 
         try {
             fileStorageService.deleteFile(document.getStorageKey());
@@ -75,6 +87,10 @@ public class DocumentService {
         }
 
         documentRepository.delete(document);
+
+        if (teamId != null) {
+            teamRepository.decrementDocumentCount(teamId);
+        }
     }
 
 

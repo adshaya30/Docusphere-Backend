@@ -1,0 +1,35 @@
+# Read the .env file and set environment variables
+Get-Content .env | ForEach-Object {
+    $line = $_.Trim()
+    if ($line -and $line -match '^([^#][^=]*)=(.*)$') {
+        $name = $matches[1].Trim()
+        $value = $matches[2].Trim()
+        
+        # Remove surrounding quotes if they exist
+        $value = $value -replace '^["'']|["'']$', ''
+        
+        if ($name) {
+            [Environment]::SetEnvironmentVariable($name, $value, "Process")
+        }
+    }
+}
+
+# Cleanup existing processes on ports 8080 and 5000
+Write-Host "Cleaning up existing processes..." -ForegroundColor Yellow
+$ports = @(8080, 5000)
+foreach ($port in $ports) {
+    $pids = netstat -ano | findstr :$port | ForEach-Object { $_.Split(' ', [System.StringSplitOptions]::RemoveEmptyEntries)[-1] } | Select-Object -Unique
+    foreach ($p in $pids) {
+        if ($p -gt 0) {
+            Stop-Process -Id $p -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
+# Start the Python OCR Service
+Write-Host "Starting Python OCR Service on port 5000..." -ForegroundColor Cyan
+Start-Process -FilePath ".\venv\Scripts\python.exe" -ArgumentList "`"scripts/ocr_server.py`"" -WindowStyle Hidden
+
+# Run the Spring Boot backend
+Write-Host "Starting Spring Boot Backend..." -ForegroundColor Green
+./mvnw spring-boot:run

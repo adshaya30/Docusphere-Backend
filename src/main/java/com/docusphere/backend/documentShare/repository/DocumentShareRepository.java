@@ -25,7 +25,8 @@ public interface DocumentShareRepository extends JpaRepository<DocumentShare, UU
         return share.getExpiresAt() != null && share.getExpiresAt().isBefore(now);
     }
 
-    // MODIFIED: Added batch delete method for admin merge team feature (deletes all shares for documents in list)
+    // MODIFIED: Added batch delete method for admin merge team feature (deletes all
+    // shares for documents in list)
     @Modifying
     void deleteByDocumentIdIn(List<UUID> documentIds);
 }

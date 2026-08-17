@@ -9,9 +9,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import jakarta.servlet.http.Cookie;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -32,6 +34,9 @@ class DocumentProtectionControllerTest {
 
     @MockitoBean
     private JwtService jwtService;
+
+    @MockitoBean
+    private UserDetailsService userDetailsService;
 
     @Test
     void enableProtection_shouldReturnSuccess() throws Exception {
@@ -65,6 +70,24 @@ class DocumentProtectionControllerTest {
 
         mockMvc.perform(post("/api/documents/{id}/verify-password", documentId)
                         .header("Authorization", "Bearer token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"password\":\"secure123\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.verified").value(true));
+    }
+
+    @Test
+    void verifyPassword_withAccessTokenCookie_shouldReturnVerified() throws Exception {
+        UUID documentId = UUID.randomUUID();
+        when(jwtService.extractUserId("cookie-token")).thenReturn(10L);
+        when(protectionService.verifyPassword(eq(10L), eq(documentId), eq("secure123"), isNull()))
+                .thenReturn(PasswordVerificationResponse.builder()
+                        .documentId(documentId)
+                        .verified(true)
+                        .build());
+
+        mockMvc.perform(post("/api/documents/{id}/verify-password", documentId)
+                        .cookie(new Cookie("accessToken", "cookie-token"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"password\":\"secure123\"}"))
                 .andExpect(status().isOk())

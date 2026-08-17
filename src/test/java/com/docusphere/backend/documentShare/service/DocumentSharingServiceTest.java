@@ -7,6 +7,7 @@ import com.docusphere.backend.Common.exception.UnauthorizedAccessException;
 import com.docusphere.backend.authentication.entity.User;
 import com.docusphere.backend.authentication.repository.UserRepository;
 import com.docusphere.backend.authentication.service.EmailService;
+import com.docusphere.backend.audit.service.AuditService;
 import com.docusphere.backend.document.entity.Document;
 import com.docusphere.backend.document.repository.DocumentRepository;
 import com.docusphere.backend.documentShare.dto.CreateShareLinkRequest;
@@ -51,6 +52,12 @@ class DocumentSharingServiceTest {
     @Mock
     private AppConfig appConfig;
 
+    @Mock
+    private AuditService auditService;
+
+    @Mock
+    private com.docusphere.backend.team.service.TeamService teamService;
+
     @Captor
     private ArgumentCaptor<DocumentShare> documentShareCaptor;
 
@@ -70,6 +77,8 @@ class DocumentSharingServiceTest {
                 userRepository,
                 emailService,
                 appConfig,
+                auditService,
+                teamService,
                 168L  // defaultShareExpiryHours (7 days)
         );
 
@@ -288,7 +297,7 @@ class DocumentSharingServiceTest {
                 () -> documentSharingService.createShareLink(requesterId, documentId, request)
         );
 
-        assertEquals("Only the owner can perform this action", exception.getMessage());
+        assertEquals("You do not have permission to share this document", exception.getMessage());
     }
 
     @Test
@@ -385,6 +394,7 @@ class DocumentSharingServiceTest {
                 .token(shareToken)
                 .permission(DocumentSharePermission.EDIT)
                 .type(ShareLinkType.EMAIL_INVITE)
+                .email("editor@example.com")
                 .revoked(false)
                 .build();
 
@@ -404,6 +414,7 @@ class DocumentSharingServiceTest {
         assertTrue(response.isCanView());
         assertTrue(response.isCanComment());
         assertTrue(response.isCanEdit());
+        assertEquals("editor@example.com", response.getInvitedEmail());
     }
 
     @Test
@@ -495,6 +506,8 @@ class DocumentSharingServiceTest {
 
         when(documentShareRepository.findByToken(shareToken))
                 .thenReturn(Optional.of(documentShare));
+        when(documentRepository.findByIdAndDeletedFalse(documentId))
+                .thenReturn(Optional.of(mockDocument));
         when(documentShareRepository.isExpired(any(DocumentShare.class), any(LocalDateTime.class)))
                 .thenReturn(false);
 
