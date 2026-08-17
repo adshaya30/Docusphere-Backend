@@ -21,6 +21,8 @@ public interface DocumentShareRepository extends JpaRepository<DocumentShare, UU
 
     void deleteByDocumentId(UUID documentId);
 
+    List<DocumentShare> findByDocumentIdAndRevokedFalseOrderByCreatedAtDesc(UUID documentId);
+
     default boolean isExpired(DocumentShare share, LocalDateTime now) {
         return share.getExpiresAt() != null && share.getExpiresAt().isBefore(now);
     }

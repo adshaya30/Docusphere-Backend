@@ -8,6 +8,7 @@ import com.docusphere.backend.authentication.service.JwtService;
 import com.docusphere.backend.comment.repository.CommentRepository;
 import com.docusphere.backend.documentShare.dto.CreateShareLinkRequest;
 import com.docusphere.backend.documentShare.dto.CreateShareLinkResponse;
+import com.docusphere.backend.documentShare.dto.DocumentShareListItemResponse;
 import com.docusphere.backend.documentShare.dto.SharedDocumentResponse;
 import com.docusphere.backend.documentShare.entity.DocumentSharePermission;
 import com.docusphere.backend.documentShare.entity.ShareLinkType;
@@ -26,6 +27,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.Mockito.*;
@@ -258,6 +260,30 @@ class DocumentSharingControllerTest {
                 .andExpect(jsonPath("$.data.expiresAt").exists());
     }
 
+    @Test
+    @DisplayName("Should list active share links for owner")
+    void testListShareLinks_Success() throws Exception {
+        when(jwtService.extractUserId("test-jwt-token")).thenReturn(userId);
+
+        DocumentShareListItemResponse item = DocumentShareListItemResponse.builder()
+                .shareLinkId(UUID.randomUUID())
+                .token("public-token")
+                .type(com.docusphere.backend.documentShare.entity.ShareLinkType.PUBLIC)
+                .permission(DocumentSharePermission.VIEW)
+                .expiresAt(LocalDateTime.now().plusDays(1))
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        when(documentSharingService.listActiveShareLinks(userId, documentId))
+                .thenReturn(List.of(item));
+
+        mockMvc.perform(get("/api/documents/{id}/shares", documentId)
+                        .header("Authorization", authToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].token").value("public-token"))
+                .andExpect(jsonPath("$.data[0].type").value("PUBLIC"));
+    }
+
     // ==================== REVOKE SHARE LINK TESTS ====================
 
     @Test
@@ -402,7 +428,7 @@ class DocumentSharingControllerTest {
         String revokedToken = "revoked-token";
 
         when(documentSharingService.openSharedDocument(revokedToken))
-                .thenThrow(new UnauthorizedAccessException("Share link was revoked"));
+                .thenThrow(new UnauthorizedAccessException("This link is no longer valid"));
 
         // Act & Assert
         mockMvc.perform(get("/api/share/{token}", revokedToken))

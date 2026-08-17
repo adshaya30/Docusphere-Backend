@@ -12,6 +12,7 @@ import com.docusphere.backend.document.entity.Document;
 import com.docusphere.backend.document.repository.DocumentRepository;
 import com.docusphere.backend.documentShare.dto.CreateShareLinkRequest;
 import com.docusphere.backend.documentShare.dto.CreateShareLinkResponse;
+import com.docusphere.backend.documentShare.dto.DocumentShareListItemResponse;
 import com.docusphere.backend.documentShare.dto.SharedDocumentResponse;
 import com.docusphere.backend.documentShare.entity.DocumentShare;
 import com.docusphere.backend.documentShare.entity.DocumentSharePermission;
@@ -27,6 +28,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -458,7 +460,7 @@ class DocumentSharingServiceTest {
                 () -> documentSharingService.openSharedDocument(shareToken)
         );
 
-        assertEquals("Share link was revoked", exception.getMessage());
+        assertEquals("This link is no longer valid", exception.getMessage());
     }
 
     @Test
@@ -544,6 +546,81 @@ class DocumentSharingServiceTest {
         verify(documentShareRepository, times(1)).save(documentShareCaptor.capture());
         DocumentShare savedShare = documentShareCaptor.getValue();
         assertTrue(savedShare.isRevoked());
+    }
+
+    @Test
+    @DisplayName("Should reject revoke when caller is not document owner")
+    void testRevokeShareLink_NotOwner_ThrowsException() {
+        mockDocument.setOwnerId(999L);
+        when(documentRepository.findByIdAndDeletedFalse(documentId))
+                .thenReturn(Optional.of(mockDocument));
+
+        UnauthorizedAccessException exception = assertThrows(
+                UnauthorizedAccessException.class,
+                () -> documentSharingService.revokeShareLink(requesterId, documentId, "some-token")
+        );
+
+        assertEquals("Only the owner can perform this action", exception.getMessage());
+        verify(documentShareRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Should be idempotent when share link is already revoked")
+    void testRevokeShareLink_AlreadyRevoked_NoOp() {
+        String shareToken = "already-revoked";
+        DocumentShare documentShare = DocumentShare.builder()
+                .id(UUID.randomUUID())
+                .document(mockDocument)
+                .token(shareToken)
+                .permission(DocumentSharePermission.VIEW)
+                .revoked(true)
+                .build();
+
+        when(documentRepository.findByIdAndDeletedFalse(documentId))
+                .thenReturn(Optional.of(mockDocument));
+        when(documentShareRepository.findByToken(shareToken))
+                .thenReturn(Optional.of(documentShare));
+
+        documentSharingService.revokeShareLink(requesterId, documentId, shareToken);
+
+        verify(documentShareRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Should list active non-expired share links for owner")
+    void testListActiveShareLinks_Success() {
+        DocumentShare publicShare = DocumentShare.builder()
+                .id(UUID.randomUUID())
+                .document(mockDocument)
+                .token("public-token")
+                .permission(DocumentSharePermission.VIEW)
+                .type(ShareLinkType.PUBLIC)
+                .revoked(false)
+                .expiresAt(LocalDateTime.now().plusDays(1))
+                .createdAt(LocalDateTime.now().minusHours(2))
+                .build();
+        DocumentShare expiredShare = DocumentShare.builder()
+                .id(UUID.randomUUID())
+                .document(mockDocument)
+                .token("expired-token")
+                .permission(DocumentSharePermission.VIEW)
+                .type(ShareLinkType.EMAIL_INVITE)
+                .email("guest@example.com")
+                .revoked(false)
+                .expiresAt(LocalDateTime.now().minusHours(1))
+                .createdAt(LocalDateTime.now().minusDays(2))
+                .build();
+
+        when(documentRepository.findByIdAndDeletedFalse(documentId))
+                .thenReturn(Optional.of(mockDocument));
+        when(documentShareRepository.findByDocumentIdAndRevokedFalseOrderByCreatedAtDesc(documentId))
+                .thenReturn(List.of(publicShare, expiredShare));
+
+        List<DocumentShareListItemResponse> shares = documentSharingService.listActiveShareLinks(requesterId, documentId);
+
+        assertEquals(1, shares.size());
+        assertEquals("public-token", shares.get(0).getToken());
+        assertEquals(ShareLinkType.PUBLIC, shares.get(0).getType());
     }
 
     @Test

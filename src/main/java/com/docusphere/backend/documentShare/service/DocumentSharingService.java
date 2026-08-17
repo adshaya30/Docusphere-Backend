@@ -12,6 +12,7 @@ import com.docusphere.backend.document.entity.Document;
 import com.docusphere.backend.document.repository.DocumentRepository;
 import com.docusphere.backend.documentShare.dto.CreateShareLinkRequest;
 import com.docusphere.backend.documentShare.dto.CreateShareLinkResponse;
+import com.docusphere.backend.documentShare.dto.DocumentShareListItemResponse;
 import com.docusphere.backend.documentShare.dto.SharedDocumentResponse;
 import com.docusphere.backend.documentShare.entity.DocumentShare;
 import com.docusphere.backend.documentShare.entity.DocumentSharePermission;
@@ -27,6 +28,7 @@ import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
@@ -131,20 +133,39 @@ public class DocumentSharingService {
                 .build();
     }
 
+    @Transactional(readOnly = true)
+    public List<DocumentShareListItemResponse> listActiveShareLinks(Long requesterId, UUID documentId) {
+        Document document = requireActiveDocument(documentId);
+        ensureOwner(document, requesterId);
+
+        LocalDateTime now = LocalDateTime.now();
+        return documentShareRepository.findByDocumentIdAndRevokedFalseOrderByCreatedAtDesc(documentId).stream()
+                .filter(share -> !isShareExpired(share, now))
+                .map(this::toShareListItem)
+                .toList();
+    }
+
     @Transactional
     public void revokeShareLink(Long requesterId, UUID documentId, String token) {
+        if (token == null || token.isBlank()) {
+            throw new InvalidRequestException("token is required");
+        }
+
         Document document = requireActiveDocument(documentId);
-        ensureCanShare(document, requesterId);
+        ensureOwner(document, requesterId);
+
         DocumentShare share = documentShareRepository
-                .findByToken(token)
+                .findByToken(token.trim())
                 .orElseThrow(() -> new DocumentNotFoundException("Share link not found"));
         if (!share.getDocument().getId().equals(documentId)) {
             throw new UnauthorizedAccessException("Share token does not belong to this document");
         }
-        share.setRevoked(true);
-        documentShareRepository.save(share);
 
-        recordAudit("SHARE_LINK_REVOKED", documentId, requesterId, Map.of("shareToken", token));
+        if (!share.isRevoked()) {
+            share.setRevoked(true);
+            documentShareRepository.save(share);
+            recordAudit("SHARE_LINK_REVOKED", documentId, requesterId, Map.of("shareToken", token.trim()));
+        }
     }
 
     @Transactional
@@ -237,7 +258,7 @@ public class DocumentSharingService {
                     .orElseThrow(() -> new DocumentNotFoundException("Share link not found"));
             if (share.isRevoked()) {
                 recordAudit("SHARE_INVITE_REVOKED", share.getDocument().getId(), null, Map.of("shareToken", token));
-                throw new UnauthorizedAccessException("Share link was revoked");
+                throw new UnauthorizedAccessException("This link is no longer valid");
             }
             if (documentShareRepository.isExpired(share, LocalDateTime.now())) {
                 recordAudit("SHARE_INVITE_EXPIRED", share.getDocument().getId(), null, Map.of("shareToken", token));
@@ -365,5 +386,21 @@ public class DocumentSharingService {
                 .map(User::getFullName)
                 .filter(name -> !name.isBlank())
                 .orElse("Document owner");
+    }
+
+    private DocumentShareListItemResponse toShareListItem(DocumentShare share) {
+        return DocumentShareListItemResponse.builder()
+                .shareLinkId(share.getId())
+                .token(share.getToken())
+                .type(share.getType())
+                .permission(share.getPermission())
+                .invitedEmail(share.getEmail())
+                .expiresAt(share.getExpiresAt())
+                .createdAt(share.getCreatedAt())
+                .build();
+    }
+
+    private boolean isShareExpired(DocumentShare share, LocalDateTime now) {
+        return share.getExpiresAt() != null && share.getExpiresAt().isBefore(now);
     }
 }

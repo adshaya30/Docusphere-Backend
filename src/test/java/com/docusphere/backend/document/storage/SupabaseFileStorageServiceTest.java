@@ -8,6 +8,7 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.core.io.Resource;
 import org.springframework.http.*;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
 import java.nio.charset.StandardCharsets;
@@ -79,6 +80,60 @@ class SupabaseFileStorageServiceTest {
         );
 
         assertTrue(exception.getMessage().contains("Upload failed"));
+    }
+
+    @Test
+    void deleteFile_shouldSucceedWhenObjectExists() {
+        when(restTemplate.exchange(any(String.class), eq(HttpMethod.DELETE), any(HttpEntity.class), eq(String.class)))
+                .thenReturn(ResponseEntity.ok("deleted"));
+
+        assertDoesNotThrow(() -> storageService.deleteFile("folder/report.pdf"));
+    }
+
+    @Test
+    void deleteFile_shouldIgnoreMissingObjectReturnedAsBadRequest() {
+        String body = "{\"statusCode\":\"404\",\"error\":\"not_found\",\"message\":\"Object not found\",\"code\":\"NoSuchKey\"}";
+        when(restTemplate.exchange(any(String.class), eq(HttpMethod.DELETE), any(HttpEntity.class), eq(String.class)))
+                .thenThrow(HttpClientErrorException.create(
+                        HttpStatus.BAD_REQUEST,
+                        "Bad Request",
+                        HttpHeaders.EMPTY,
+                        body.getBytes(StandardCharsets.UTF_8),
+                        StandardCharsets.UTF_8
+                ));
+
+        assertDoesNotThrow(() -> storageService.deleteFile("Documents/missing.xlsx"));
+    }
+
+    @Test
+    void deleteFile_shouldIgnoreNotFoundStatus() {
+        when(restTemplate.exchange(any(String.class), eq(HttpMethod.DELETE), any(HttpEntity.class), eq(String.class)))
+                .thenThrow(HttpClientErrorException.create(
+                        HttpStatus.NOT_FOUND,
+                        "Not Found",
+                        HttpHeaders.EMPTY,
+                        "{\"error\":\"not_found\"}".getBytes(StandardCharsets.UTF_8),
+                        StandardCharsets.UTF_8
+                ));
+
+        assertDoesNotThrow(() -> storageService.deleteFile("Documents/missing.xlsx"));
+    }
+
+    @Test
+    void deleteFile_shouldFailForOtherClientErrors() {
+        when(restTemplate.exchange(any(String.class), eq(HttpMethod.DELETE), any(HttpEntity.class), eq(String.class)))
+                .thenThrow(HttpClientErrorException.create(
+                        HttpStatus.FORBIDDEN,
+                        "Forbidden",
+                        HttpHeaders.EMPTY,
+                        "denied".getBytes(StandardCharsets.UTF_8),
+                        StandardCharsets.UTF_8
+                ));
+
+        FileUploadException exception = assertThrows(FileUploadException.class, () ->
+                storageService.deleteFile("Documents/secret.xlsx")
+        );
+        assertTrue(exception.getMessage().contains("Failed to delete file from storage"));
     }
 }
 
