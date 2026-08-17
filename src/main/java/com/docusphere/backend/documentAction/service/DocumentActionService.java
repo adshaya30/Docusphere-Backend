@@ -22,11 +22,11 @@ public interface DocumentActionService {
 
     TrashDocumentsPageResponse getTrash(Long requesterId, int page, int size);
 
-    Resource download(Long requesterId, UUID documentId);
+    Resource download(Long requesterId, UUID documentId, String password);
 
-    String resolveDownloadFilename(Long requesterId, UUID documentId);
+    String resolveDownloadFilename(Long requesterId, UUID documentId, String password);
 
-    Resource downloadByShareToken(UUID documentId, String token);
+    Resource downloadByShareToken(UUID documentId, String token, String password);
 
-    String resolveDownloadFilenameByShareToken(UUID documentId, String token);
+    String resolveDownloadFilenameByShareToken(UUID documentId, String token, String password);
 }

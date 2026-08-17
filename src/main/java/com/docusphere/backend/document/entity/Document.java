@@ -55,11 +55,23 @@ public class Document {
 	@Column(nullable = false)
 	private boolean secured = false;
 
+	@Column(name = "password_hash")
+	private String passwordHash;
+
 	@Column(name = "created_at")
 	private LocalDateTime createdAt;
 
 	@Column(name = "updated_at")
 	private LocalDateTime updatedAt;
+
+	/** {@code secured} column — document requires a password to open/download. */
+	public boolean isPasswordProtected() {
+		return secured;
+	}
+
+	public void setPasswordProtected(boolean passwordProtected) {
+		this.secured = passwordProtected;
+	}
 
 	@PrePersist
 	public void onCreate() {
