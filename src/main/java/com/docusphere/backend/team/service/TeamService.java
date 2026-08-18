@@ -8,6 +8,8 @@ import com.docusphere.backend.team.dto.UserStatusDto;
 import com.docusphere.backend.team.entity.Team;
 import com.docusphere.backend.team.entity.TeamMember;
 import com.docusphere.backend.team.entity.TeamRole;
+import com.docusphere.backend.team.entity.TeamInvitation;
+import com.docusphere.backend.team.repository.TeamInvitationRepository;
 import com.docusphere.backend.team.repository.TeamMemberRepository;
 import com.docusphere.backend.team.repository.TeamRepository;
 import com.docusphere.backend.team.repository.UserActivityRepository;
@@ -32,17 +34,20 @@ public class TeamService {
     private final DocumentRepository documentRepository;
     private final UserRepository userRepository;
     private final UserActivityRepository userActivityRepository;
+    private final TeamInvitationRepository teamInvitationRepository;
 
     public TeamService(TeamRepository teamRepository,
                        TeamMemberRepository teamMemberRepository,
                        DocumentRepository documentRepository,
                        UserRepository userRepository,
-                       UserActivityRepository userActivityRepository) {
+                       UserActivityRepository userActivityRepository,
+                       TeamInvitationRepository teamInvitationRepository) {
         this.teamRepository = teamRepository;
         this.teamMemberRepository = teamMemberRepository;
         this.documentRepository = documentRepository;
         this.userRepository = userRepository;
         this.userActivityRepository = userActivityRepository;
+        this.teamInvitationRepository = teamInvitationRepository;
     }
 
     //Finders
@@ -59,10 +64,17 @@ public class TeamService {
     }
 
     public List<TeamMemberDto> getMembersOfTeam(UUID teamId) {
-        return teamMemberRepository.findAllByTeamId(teamId)
+        List<TeamMemberDto> members = teamMemberRepository.findAllByTeamId(teamId)
                 .stream()
                 .map(this::toMemberDto)
                 .collect(Collectors.toList());
+                
+        members.addAll(teamInvitationRepository.findAllByTeamId(teamId)
+                .stream()
+                .map(this::toMemberDtoFromInvitation)
+                .collect(Collectors.toList()));
+                
+        return members;
     }
 
     public List<TeamMemberDto> getMembersByRole(UUID teamId, TeamRole role) {
@@ -125,7 +137,7 @@ public class TeamService {
         dto.setTeamName(tm.getTeam().getTeamName());
         dto.setRole(tm.getRole() != null ? tm.getRole().name() : null);
         dto.setJoinedAt(tm.getJoinedAt());
-        dto.setActive(tm.getActive());
+        dto.setActive(tm.getActive() == null ? true : tm.getActive());
 
         // Enrich with email and fullName from UserRepository
         userRepository.findById(tm.getUserId()).ifPresent(user -> {
@@ -135,6 +147,21 @@ public class TeamService {
             }
         });
 
+        // For joined members, we can set status as Active or leave it empty, depending on frontend. Let's set it to Active.
+        dto.setStatus("Active");
+
+        return dto;
+    }
+
+    public TeamMemberDto toMemberDtoFromInvitation(TeamInvitation inv) {
+        TeamMemberDto dto = new TeamMemberDto();
+        dto.setId(java.util.UUID.nameUUIDFromBytes(inv.getEmail().getBytes()));
+        dto.setTeamId(inv.getTeamId());
+        dto.setFullName("Pending Invitation");
+        dto.setEmail(inv.getEmail());
+        dto.setRole(inv.getRole() != null ? inv.getRole().name() : null);
+        dto.setStatus("Pending");
+        dto.setActive(false);
         return dto;
     }
 

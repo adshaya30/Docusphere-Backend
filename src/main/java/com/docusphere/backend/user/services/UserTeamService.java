@@ -135,6 +135,7 @@ public class UserTeamService {
         member.setUserId(user.getId());
         member.setFullName(user.getFullName());
         member.setRole(TeamRole.LEADER);
+        member.setActive(true);
         teamMemberRepository.save(member);
 
         // Process initial members if any
@@ -391,6 +392,7 @@ public class UserTeamService {
         member.setUserId(userId);
         member.setFullName(user.getFullName());
         member.setRole(invitation.getRole());
+        member.setActive(true);
         teamMemberRepository.save(member);
         teamRepository.incrementMemberCount(team.getId());
 
