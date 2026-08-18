@@ -93,4 +93,24 @@ class DocumentProtectionControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.verified").value(true));
     }
+
+    @Test
+    void resetProtection_withPasswordResetEndpoint_shouldReturnSuccess() throws Exception {
+        UUID documentId = UUID.randomUUID();
+        when(jwtService.extractUserId(anyString())).thenReturn(10L);
+        when(protectionService.resetProtectionPassword(eq(10L), eq(documentId), eq("Secure1!"), eq("AccountPass1!")))
+                .thenReturn(DocumentProtectionResponse.builder()
+                        .documentId(documentId)
+                        .name("report.pdf")
+                        .passwordProtected(true)
+                        .updatedAt(LocalDateTime.now())
+                        .build());
+
+        mockMvc.perform(post("/api/documents/{id}/password/reset", documentId)
+                        .header("Authorization", "Bearer token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"newPassword\":\"Secure1!\",\"accountPassword\":\"AccountPass1!\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.passwordProtected").value(true));
+    }
 }
