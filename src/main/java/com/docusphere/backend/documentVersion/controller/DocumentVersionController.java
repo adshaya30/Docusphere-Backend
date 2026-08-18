@@ -36,10 +36,16 @@ public class DocumentVersionController {
     @GetMapping
     public ResponseEntity<ApiResponse<DocumentVersionListResponse>> listVersions(
             @PathVariable UUID documentId,
+            @RequestParam(value = "token", required = false) String shareToken,
             HttpServletRequest request
     ) {
-        Long requesterId = extractRequesterId(request);
-        DocumentVersionListResponse data = documentVersionService.listVersions(requesterId, documentId);
+        DocumentVersionListResponse data;
+        if (shareToken != null && !shareToken.isBlank()) {
+            data = documentVersionService.listVersionsByShareToken(shareToken, documentId);
+        } else {
+            Long requesterId = extractRequesterId(request);
+            data = documentVersionService.listVersions(requesterId, documentId);
+        }
         return ResponseEntity.ok(ApiResponse.success(data));
     }
 
@@ -81,7 +87,10 @@ public class DocumentVersionController {
             @RequestHeader(value = "X-Document-Password", required = false) String passwordHeader,
             HttpServletRequest request
     ) {
-        Long requesterId = extractRequesterId(request);
+        Long requesterId = null;
+        if (shareToken == null || shareToken.isBlank()) {
+            requesterId = extractRequesterId(request);
+        }
         OnlyOfficeConfig config = documentVersionService.previewVersion(
                 requesterId,
                 documentId,

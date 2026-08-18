@@ -12,6 +12,8 @@ import com.docusphere.backend.documentShare.dto.DocumentShareListItemResponse;
 import com.docusphere.backend.documentShare.dto.ShareCommentRequest;
 import com.docusphere.backend.documentShare.dto.SharedDocumentResponse;
 import com.docusphere.backend.documentShare.service.DocumentSharingService;
+import com.docusphere.backend.documentVersion.dto.DocumentVersionListResponse;
+import com.docusphere.backend.documentVersion.service.DocumentVersionService;
 import com.docusphere.backend.onlyoffice.dto.SharedEditorConfigResponse;
 import com.docusphere.backend.onlyoffice.service.OnlyOfficeEditorConfigService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -29,6 +31,7 @@ import java.util.UUID;
 public class DocumentSharingController {
 
     private final DocumentSharingService documentSharingService;
+    private final DocumentVersionService documentVersionService;
     private final OnlyOfficeEditorConfigService onlyOfficeEditorConfigService;
     private final CommentRepository commentRepository;
     private final UserRepository userRepository;
@@ -36,12 +39,14 @@ public class DocumentSharingController {
 
     public DocumentSharingController(
             DocumentSharingService documentSharingService,
+            DocumentVersionService documentVersionService,
             OnlyOfficeEditorConfigService onlyOfficeEditorConfigService,
             CommentRepository commentRepository,
             UserRepository userRepository,
             JwtService jwtService
     ) {
         this.documentSharingService = documentSharingService;
+        this.documentVersionService = documentVersionService;
         this.onlyOfficeEditorConfigService = onlyOfficeEditorConfigService;
         this.commentRepository = commentRepository;
         this.userRepository = userRepository;
@@ -113,6 +118,14 @@ public class DocumentSharingController {
                 .config(config)
                 .build();
         return ResponseEntity.ok(ApiResponse.success("Shared editor config fetched successfully", response));
+    }
+
+    @GetMapping("/api/share/{token}/versions")
+    public ResponseEntity<ApiResponse<DocumentVersionListResponse>> listShareVersions(
+            @PathVariable("token") String shareToken
+    ) {
+        DocumentVersionListResponse response = documentVersionService.listVersionsForShare(shareToken);
+        return ResponseEntity.ok(ApiResponse.success("Version history fetched successfully", response));
     }
 
     @GetMapping("/api/share/{token}/comments")

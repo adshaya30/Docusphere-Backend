@@ -115,7 +115,25 @@ public class DocumentVersionService {
     public DocumentVersionListResponse listVersions(Long requesterId, UUID documentId) {
         Document document = requireActiveDocument(documentId);
         ensureCanView(document, requesterId);
+        return buildVersionListResponse(document);
+    }
 
+    @Transactional(readOnly = true)
+    public DocumentVersionListResponse listVersionsForShare(String shareToken) {
+        var shared = documentSharingService.openSharedDocument(shareToken);
+        Document document = requireActiveDocument(shared.getDocumentId());
+        return buildVersionListResponse(document);
+    }
+
+    @Transactional(readOnly = true)
+    public DocumentVersionListResponse listVersionsByShareToken(String shareToken, UUID documentId) {
+        documentSharingService.requireValidShareForDocument(documentId, shareToken);
+        Document document = requireActiveDocument(documentId);
+        return buildVersionListResponse(document);
+    }
+
+    private DocumentVersionListResponse buildVersionListResponse(Document document) {
+        UUID documentId = document.getId();
         List<DocumentVersion> versions = documentVersionRepository.findByDocumentIdOrderByVersionNumberDesc(documentId);
         int maxStoredVersion = versions.stream()
                 .mapToInt(DocumentVersion::getVersionNumber)
