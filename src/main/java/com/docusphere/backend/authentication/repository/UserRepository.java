@@ -18,4 +18,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Modifying
     @Query("UPDATE User u SET u.failedLoginAttempts = 0, u.accountLocked = false, u.lockedUntil = null WHERE u.accountLocked = true AND u.lockedUntil < :now")
     int unlockExpiredAccounts(@Param("now") LocalDateTime now);
+
+    @Query("SELECT u.id FROM User u WHERE u.role.name = 'ROLE_ADMIN'")
+    List<Long> findAllAdminUserIds();
 }

@@ -41,8 +41,8 @@ class SupportTicketServiceTest {
         Role userRole = new Role(1L, "ROLE_USER");
         Role adminRole = new Role(2L, "ROLE_ADMIN");
 
-        user = new User(1L, "John Doe", "john@example.com", "password", true, userRole, null, null);
-        admin = new User(2L, "Admin User", "admin@example.com", "password", true, adminRole, null, null);
+        user = new User(1L, "John Doe", "john@example.com", "password", true, userRole, java.time.LocalDateTime.now(), null, 0, false, null);
+        admin = new User(2L, "Admin User", "admin@example.com", "password", true, adminRole, java.time.LocalDateTime.now(), null, 0, false, null);
 
         ticket = SupportTicket.builder()
                 .id(100L)
@@ -96,7 +96,7 @@ class SupportTicketServiceTest {
     @Test
     void getTicketById_shouldThrowUnauthorizedWhenUserIsNotOwnerOrAdmin() {
         Role otherRole = new Role(1L, "ROLE_USER");
-        User otherUser = new User(3L, "Bob", "bob@example.com", "pass", true, otherRole, null, null);
+        User otherUser = new User(3L, "Bob", "bob@example.com", "pass", true, otherRole, java.time.LocalDateTime.now(), null, 0, false, null);
         when(ticketRepository.findById(100L)).thenReturn(Optional.of(ticket));
 
         assertThrows(UnauthorizedAccessException.class, () -> service.getTicketById(100L, otherUser));
