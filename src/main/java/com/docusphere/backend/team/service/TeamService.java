@@ -137,7 +137,7 @@ public class TeamService {
         dto.setTeamName(tm.getTeam().getTeamName());
         dto.setRole(tm.getRole() != null ? tm.getRole().name() : null);
         dto.setJoinedAt(tm.getJoinedAt());
-        dto.setActive(tm.getActive());
+        dto.setActive(tm.getActive() == null ? true : tm.getActive());
 
         // Enrich with email and fullName from UserRepository
         userRepository.findById(tm.getUserId()).ifPresent(user -> {
