@@ -13,6 +13,8 @@ import com.docusphere.backend.documentShare.dto.SharedDocumentResponse;
 import com.docusphere.backend.documentShare.entity.DocumentSharePermission;
 import com.docusphere.backend.documentShare.entity.ShareLinkType;
 import com.docusphere.backend.documentShare.service.DocumentSharingService;
+import com.docusphere.backend.documentVersion.dto.DocumentVersionListResponse;
+import com.docusphere.backend.documentVersion.service.DocumentVersionService;
 import com.docusphere.backend.onlyoffice.service.OnlyOfficeEditorConfigService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -48,6 +50,9 @@ class DocumentSharingControllerTest {
 
     @MockitoBean
     private DocumentSharingService documentSharingService;
+
+    @MockitoBean
+    private DocumentVersionService documentVersionService;
 
     @MockitoBean
     private OnlyOfficeEditorConfigService onlyOfficeEditorConfigService;
@@ -534,6 +539,23 @@ class DocumentSharingControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isInternalServerError());
+    }
+
+    @Test
+    @DisplayName("Should return version history for shared document token")
+    void listShareVersions_success() throws Exception {
+        DocumentVersionListResponse response = DocumentVersionListResponse.builder()
+                .documentId(documentId)
+                .currentVersionNumber(2)
+                .isProtected(false)
+                .versions(List.of())
+                .build();
+
+        when(documentVersionService.listVersionsForShare("share-token")).thenReturn(response);
+
+        mockMvc.perform(get("/api/share/{token}/versions", "share-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.currentVersionNumber").value(2));
     }
 }
 

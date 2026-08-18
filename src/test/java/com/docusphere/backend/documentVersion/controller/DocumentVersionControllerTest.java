@@ -101,6 +101,24 @@ class DocumentVersionControllerTest {
     }
 
     @Test
+    @DisplayName("Should return version history for share token without login")
+    void listVersions_withShareToken_success() throws Exception {
+        DocumentVersionListResponse response = DocumentVersionListResponse.builder()
+                .documentId(documentId)
+                .currentVersionNumber(2)
+                .isProtected(false)
+                .versions(List.of())
+                .build();
+
+        when(documentVersionService.listVersionsByShareToken("share-token", documentId)).thenReturn(response);
+
+        mockMvc.perform(get("/api/documents/{documentId}/versions", documentId)
+                        .param("token", "share-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.currentVersionNumber").value(2));
+    }
+
+    @Test
     @DisplayName("Should save change summary using trimmed summary field")
     void saveChangeSummary_success() throws Exception {
         when(jwtService.extractUserId("test-token")).thenReturn(requesterId);
@@ -126,19 +144,16 @@ class DocumentVersionControllerTest {
     @Test
     @DisplayName("Should preview version with password header fallback")
     void previewVersion_success() throws Exception {
-        when(jwtService.extractUserId("test-token")).thenReturn(requesterId);
-
         OnlyOfficeConfig config = OnlyOfficeConfig.builder()
                 .documentType("word")
                 .width("100%")
                 .height("100%")
                 .token("doc-token")
                 .build();
-        when(documentVersionService.previewVersion(requesterId, documentId, versionId, "secret123", "share-token"))
+        when(documentVersionService.previewVersion(null, documentId, versionId, "secret123", "share-token"))
                 .thenReturn(config);
 
         mockMvc.perform(get("/api/documents/{documentId}/versions/{versionId}/preview", documentId, versionId)
-                        .header("Authorization", "Bearer test-token")
                         .header("X-Document-Password", "secret123")
                         .param("token", "share-token"))
                 .andExpect(status().isOk())
