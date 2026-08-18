@@ -5,11 +5,14 @@ import com.docusphere.backend.Common.exception.InvalidRequestException;
 import com.docusphere.backend.Common.exception.UnauthorizedAccessException;
 import com.docusphere.backend.audit.service.AuditService;
 import com.docusphere.backend.Common.util.PasswordValidator;
+import com.docusphere.backend.authentication.entity.User;
+import com.docusphere.backend.authentication.repository.UserRepository;
 import com.docusphere.backend.document.entity.Document;
 import com.docusphere.backend.document.repository.DocumentRepository;
 import com.docusphere.backend.documentAction.service.TeamAccessValidator;
 import com.docusphere.backend.documentProtection.dto.DocumentProtectionResponse;
 import com.docusphere.backend.documentProtection.dto.PasswordVerificationResponse;
+import com.docusphere.backend.onlyoffice.service.DocumentEditPermissionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -44,6 +47,13 @@ class DocumentPasswordProtectionServiceTest {
 
     @Mock
     private DocumentSharingService documentSharingService;
+    @Mock
+    private DocumentEditPermissionService documentEditPermissionService;
+    @Mock
+    private UserRepository userRepository;
+
+    private static final String ACCOUNT_PASSWORD = "AccountPass1!";
+    private User ownerUser;
 
     private PasswordEncoder passwordEncoder;
     private PasswordValidator passwordValidator;
@@ -67,10 +77,19 @@ class DocumentPasswordProtectionServiceTest {
                 accessGuard,
                 verificationStore,
                 passwordValidator,
-                auditService
+                auditService,
+                documentEditPermissionService,
+                userRepository
         );
 
         documentId = UUID.randomUUID();
+
+        ownerUser = new User();
+        ownerUser.setId(10L);
+        ownerUser.setFullName("Test Owner");
+        ownerUser.setEmail("owner@test.com");
+        ownerUser.setPassword(passwordEncoder.encode(ACCOUNT_PASSWORD));
+        ownerUser.setEnabled(true);
         document = Document.builder()
                 .id(documentId)
                 .fileId("file-1")
@@ -131,10 +150,11 @@ class DocumentPasswordProtectionServiceTest {
     void resetProtectionPassword_shouldUpdateHashAndKeepProtectionEnabled() {
         document.setPasswordProtected(true);
         document.setPasswordHash(passwordEncoder.encode(DOCUMENT_PASSWORD));
+        when(userRepository.findById(10L)).thenReturn(Optional.of(ownerUser));
         when(documentRepository.findByIdAndDeletedFalse(documentId)).thenReturn(Optional.of(document));
         when(documentRepository.save(any(Document.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        DocumentProtectionResponse response = service.resetProtectionPassword(10L, documentId, VALID_PASSWORD);
+        DocumentProtectionResponse response = service.resetProtectionPassword(10L, documentId, VALID_PASSWORD, ACCOUNT_PASSWORD);
 
         assertTrue(response.isPasswordProtected());
         assertTrue(passwordEncoder.matches(VALID_PASSWORD, document.getPasswordHash()));
@@ -142,21 +162,63 @@ class DocumentPasswordProtectionServiceTest {
     }
 
     @Test
-    void resetProtectionPassword_shouldRejectWeakPassword() {
+    void resetProtectionPassword_shouldRejectWrongAccountPassword() {
+        when(userRepository.findById(10L)).thenReturn(Optional.of(ownerUser));
+
+        assertThrows(InvalidPasswordException.class,
+                () -> service.resetProtectionPassword(10L, documentId, VALID_PASSWORD, "wrongAccountPass"));
+        verify(documentRepository, never()).save(any(Document.class));
+    }
+
+    @Test
+    void resetProtectionPassword_shouldRejectMissingAccountPassword() {
         assertThrows(InvalidRequestException.class,
-                () -> service.resetProtectionPassword(10L, documentId, "short"));
+                () -> service.resetProtectionPassword(10L, documentId, VALID_PASSWORD, ""));
+        verify(documentRepository, never()).save(any(Document.class));
+    }
+
+    @Test
+    void resetProtectionPassword_shouldRejectWeakNewPassword() {
+        when(userRepository.findById(10L)).thenReturn(Optional.of(ownerUser));
+
+        assertThrows(InvalidRequestException.class,
+                () -> service.resetProtectionPassword(10L, documentId, "short", ACCOUNT_PASSWORD));
         verify(documentRepository, never()).findByIdAndDeletedFalse(any());
         verify(documentRepository, never()).save(any(Document.class));
     }
 
     @Test
     void resetProtectionPassword_shouldRejectNonOwner() {
+        User nonOwner = new User();
+        nonOwner.setId(99L);
+        nonOwner.setPassword(passwordEncoder.encode(ACCOUNT_PASSWORD));
         document.setPasswordProtected(true);
         document.setPasswordHash(passwordEncoder.encode(DOCUMENT_PASSWORD));
+        document.setTeamId(null);
+        when(userRepository.findById(99L)).thenReturn(Optional.of(nonOwner));
         when(documentRepository.findByIdAndDeletedFalse(documentId)).thenReturn(Optional.of(document));
 
         assertThrows(UnauthorizedAccessException.class,
-                () -> service.resetProtectionPassword(99L, documentId, VALID_PASSWORD));
+                () -> service.resetProtectionPassword(99L, documentId, VALID_PASSWORD, ACCOUNT_PASSWORD));
+    }
+
+    @Test
+    void resetProtectionPassword_shouldAllowTeamUserWithEditPermission() {
+        User teamUser = new User();
+        teamUser.setId(99L);
+        teamUser.setPassword(passwordEncoder.encode(ACCOUNT_PASSWORD));
+        document.setPasswordProtected(true);
+        document.setTeamId(UUID.randomUUID());
+        document.setPasswordHash(passwordEncoder.encode(DOCUMENT_PASSWORD));
+        when(userRepository.findById(99L)).thenReturn(Optional.of(teamUser));
+        when(documentRepository.findByIdAndDeletedFalse(documentId)).thenReturn(Optional.of(document));
+        when(documentRepository.save(any(Document.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(documentEditPermissionService.canEdit(document, 99L)).thenReturn(true);
+
+        DocumentProtectionResponse response = service.resetProtectionPassword(99L, documentId, VALID_PASSWORD, ACCOUNT_PASSWORD);
+
+        assertTrue(response.isPasswordProtected());
+        assertTrue(passwordEncoder.matches(VALID_PASSWORD, document.getPasswordHash()));
     }
 
     @Test

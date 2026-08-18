@@ -254,6 +254,35 @@ public class AuthController {
             throw e;
         }
     }
+    @PostMapping("/verify-password")
+    public ResponseEntity<MessageResponse> verifyPassword(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @CookieValue(name = ACCESS_TOKEN_COOKIE, required = false) String accessToken,
+            @RequestBody java.util.Map<String, String> body) {
+
+        String email = null;
+        if (userDetails != null && userDetails.getUsername() != null && !userDetails.getUsername().isBlank()) {
+            email = userDetails.getUsername();
+        } else if (accessToken != null && !accessToken.isBlank()) {
+            email = jwtService.extractUsername(accessToken);
+        }
+
+        if (email == null || email.isBlank()) {
+            throw new BadCredentialsException("No active session.");
+        }
+
+        String password = body != null ? body.get("password") : null;
+        if (password == null || password.isBlank()) {
+            throw new BadCredentialsException("Password is required.");
+        }
+
+        authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(email, password)
+        );
+
+        return ResponseEntity.ok(new MessageResponse("Password verified successfully.", 200));
+    }
+
     @PutMapping("/change-password")
     public ResponseEntity<MessageResponse> changePassword(
             @AuthenticationPrincipal UserDetails userDetails,

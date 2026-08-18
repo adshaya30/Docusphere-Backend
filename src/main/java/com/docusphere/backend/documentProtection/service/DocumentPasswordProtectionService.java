@@ -5,10 +5,13 @@ import com.docusphere.backend.Common.exception.DocumentNotFoundException;
 import com.docusphere.backend.Common.exception.InvalidPasswordException;
 import com.docusphere.backend.Common.exception.InvalidRequestException;
 import com.docusphere.backend.Common.exception.UnauthorizedAccessException;
+import com.docusphere.backend.authentication.entity.User;
+import com.docusphere.backend.authentication.repository.UserRepository;
 import com.docusphere.backend.document.entity.Document;
 import com.docusphere.backend.document.repository.DocumentRepository;
 import com.docusphere.backend.documentProtection.dto.DocumentProtectionResponse;
 import com.docusphere.backend.documentProtection.dto.PasswordVerificationResponse;
+import com.docusphere.backend.onlyoffice.service.DocumentEditPermissionService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,6 +28,8 @@ public class DocumentPasswordProtectionService {
     private final DocumentPasswordVerificationStore verificationStore;
     private final PasswordValidator passwordValidator;
     private final AuditService auditService;
+    private final DocumentEditPermissionService documentEditPermissionService;
+    private final UserRepository userRepository;
 
     public DocumentPasswordProtectionService(
             DocumentRepository documentRepository,
@@ -32,7 +37,9 @@ public class DocumentPasswordProtectionService {
             DocumentPasswordAccessGuard accessGuard,
             DocumentPasswordVerificationStore verificationStore,
             PasswordValidator passwordValidator,
-            AuditService auditService
+            AuditService auditService,
+            DocumentEditPermissionService documentEditPermissionService,
+            UserRepository userRepository
     ) {
         this.documentRepository = documentRepository;
         this.passwordEncoder = passwordEncoder;
@@ -40,6 +47,8 @@ public class DocumentPasswordProtectionService {
         this.verificationStore = verificationStore;
         this.passwordValidator = passwordValidator;
         this.auditService = auditService;
+        this.documentEditPermissionService = documentEditPermissionService;
+        this.userRepository = userRepository;
     }
 
     @Transactional
@@ -105,10 +114,18 @@ public class DocumentPasswordProtectionService {
     }
 
     @Transactional
-    public DocumentProtectionResponse resetProtectionPassword(Long requesterId, UUID documentId, String newPassword) {
+    public DocumentProtectionResponse resetProtectionPassword(
+            Long requesterId,
+            UUID documentId,
+            String newPassword,
+            String accountPassword
+    ) {
+        // Verify the caller's DocuSphere account password before allowing the reset
+        verifyAccountPassword(requesterId, accountPassword);
+
         passwordValidator.validateOrThrow(newPassword);
         Document document = requireActiveDocument(documentId);
-        ensureOwner(document, requesterId);
+        ensureCanResetProtection(document, requesterId);
 
         document.setPasswordProtected(true);
         document.setPasswordHash(passwordEncoder.encode(newPassword));
@@ -116,6 +133,39 @@ public class DocumentPasswordProtectionService {
 
         Document saved = documentRepository.save(document);
         return toProtectionResponse(saved);
+    }
+
+    private void verifyAccountPassword(Long requesterId, String accountPassword) {
+        if (requesterId == null) {
+            throw new UnauthorizedAccessException("Authentication required");
+        }
+        if (accountPassword == null || accountPassword.isBlank()) {
+            throw new InvalidRequestException("accountPassword is required");
+        }
+        User user = userRepository.findById(requesterId)
+                .orElseThrow(() -> new UnauthorizedAccessException("User not found"));
+        if (!passwordEncoder.matches(accountPassword, user.getPassword())) {
+            recordPasswordAudit("DOCUMENT_RESET_ACCOUNT_PASSWORD_FAILED", null, requesterId, null);
+            throw new InvalidPasswordException("Account password is incorrect");
+        }
+    }
+
+    private void ensureCanResetProtection(Document document, Long requesterId) {
+        if (requesterId == null) {
+            throw new UnauthorizedAccessException("You do not have permission to reset this document password");
+        }
+
+        if (document.getOwnerId().equals(requesterId)) {
+            return;
+        }
+
+        if (document.getTeamId() != null
+                && documentEditPermissionService != null
+                && documentEditPermissionService.canEdit(document, requesterId)) {
+            return;
+        }
+
+        throw new UnauthorizedAccessException("You do not have permission to reset this document password");
     }
 
     public void requirePasswordForContentAccess(
@@ -140,7 +190,9 @@ public class DocumentPasswordProtectionService {
 
     private void recordPasswordAudit(String action, UUID documentId, Long requesterId, String shareToken) {
         java.util.Map<String, Object> metadata = new java.util.HashMap<>();
-        metadata.put("documentId", documentId.toString());
+        if (documentId != null) {
+            metadata.put("documentId", documentId.toString());
+        }
         if (requesterId != null) {
             metadata.put("userId", requesterId);
         }

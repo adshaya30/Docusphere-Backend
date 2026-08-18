@@ -48,7 +48,7 @@ public class DocumentProtectionController {
         return ResponseEntity.ok(ApiResponse.success("Document protection enabled", response));
     }
 
-    @PostMapping("/{id}/protect/reset")
+    @PostMapping({"/{id}/protect/reset", "/{id}/password/reset"})
     public ResponseEntity<ApiResponse<DocumentProtectionResponse>> resetProtection(
             @PathVariable("id") UUID documentId,
             @Valid @RequestBody ResetDocumentPasswordRequest request,
@@ -58,9 +58,10 @@ public class DocumentProtectionController {
         DocumentProtectionResponse response = protectionService.resetProtectionPassword(
                 requesterId,
                 documentId,
-                request.getNewPassword()
+                request.getNewPassword(),
+                request.getAccountPassword()
         );
-        return ResponseEntity.ok(ApiResponse.success("Password reset successfully", response));
+        return ResponseEntity.ok(ApiResponse.success("Document protection password reset successfully", response));
     }
 
     @DeleteMapping("/{id}/protect")
