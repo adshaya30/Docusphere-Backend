@@ -155,7 +155,7 @@ public class TeamService {
 
     public TeamMemberDto toMemberDtoFromInvitation(TeamInvitation inv) {
         TeamMemberDto dto = new TeamMemberDto();
-        dto.setId(java.util.UUID.nameUUIDFromBytes(inv.getEmail().getBytes()));
+        dto.setId(inv.getId()); // Use the actual DB UUID so delete/role-change works
         dto.setTeamId(inv.getTeamId());
         dto.setFullName("Pending Invitation");
         dto.setEmail(inv.getEmail());

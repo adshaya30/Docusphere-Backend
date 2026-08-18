@@ -35,11 +35,7 @@ public class AdminReportExportService {
         this.documentRepository = documentRepository;
     }
 
-    // ==================== USERS EXPORT ====================
 
-    /**
-     * Export all users to PDF
-     */
     public byte[] exportUsersToPDF() throws DocumentException, IOException {
         com.itextpdf.text.Document document = new com.itextpdf.text.Document();
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -59,7 +55,7 @@ public class AdminReportExportService {
 
         List<User> users = userRepository.findAll();
         for (User user : users) {
-            table.addCell(user.getId().toString());
+            table.addCell(user.getId() != null ? user.getId().toString() : "N/A");
             table.addCell(user.getFullName() != null ? user.getFullName() : "N/A");
             table.addCell(user.getEmail());
             table.addCell(user.getRole() != null ? user.getRole().getName() : "USER");
@@ -83,7 +79,7 @@ public class AdminReportExportService {
         List<User> users = userRepository.findAll();
         for (User user : users) {
             csvPrinter.printRecord(
-                user.getId().toString(),
+                user.getId() != null ? user.getId().toString() : "N/A",
                 user.getFullName() != null ? user.getFullName() : "N/A",
                 user.getEmail(),
                 user.getRole() != null ? user.getRole().getName() : "USER"
@@ -96,11 +92,7 @@ public class AdminReportExportService {
         return baos.toByteArray();
     }
 
-    // ==================== TEAMS EXPORT ====================
-
-    /**
-     * Export all teams to PDF
-     */
+   
     public byte[] exportTeamsToPDF() throws DocumentException, IOException {
         com.itextpdf.text.Document document = new com.itextpdf.text.Document();
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -155,11 +147,8 @@ public class AdminReportExportService {
         return baos.toByteArray();
     }
 
-    // ==================== DOCUMENTS EXPORT ====================
+    
 
-    /**
-     * Export all documents to PDF
-     */
     public byte[] exportDocumentsToPDF() throws DocumentException, IOException {
         com.itextpdf.text.Document document = new com.itextpdf.text.Document();
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -204,9 +193,7 @@ public class AdminReportExportService {
         return baos.toByteArray();
     }
 
-    /**
-     * Export all documents to CSV
-     */
+   
     public byte[] exportDocumentsToCSV() throws IOException {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         OutputStreamWriter osw = new OutputStreamWriter(baos);
@@ -238,8 +225,6 @@ public class AdminReportExportService {
         osw.close();
         return baos.toByteArray();
     }
-
-    // ==================== XLSX EXPORTS ====================
 
     private CellStyle createHeaderStyle(Workbook wb) {
         CellStyle style = wb.createCellStyle();
@@ -351,7 +336,7 @@ public class AdminReportExportService {
         }
     }
 
-    // ==================== HELPER METHODS ====================
+
 
     private void addTableHeader(PdfPTable table, String[] headers) {
         com.itextpdf.text.Font headerFont = new com.itextpdf.text.Font(com.itextpdf.text.Font.FontFamily.HELVETICA, 11, com.itextpdf.text.Font.BOLD);

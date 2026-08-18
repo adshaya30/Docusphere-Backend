@@ -29,7 +29,7 @@ public class WebSocketAuthChannelInterceptor implements ChannelInterceptor {
         if (accessor != null && StompCommand.CONNECT.equals(accessor.getCommand())) {
             String token = extractToken(accessor);
             Long userId = jwtService.extractUserId(token);
-            Principal principal = () -> String.valueOf(userId);
+            Principal principal = () -> com.docusphere.backend.notification.util.NotificationUserIds.fromUserId(userId).toString();
             accessor.setUser(principal);
         }
 

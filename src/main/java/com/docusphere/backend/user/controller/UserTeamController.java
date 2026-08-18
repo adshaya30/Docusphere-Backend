@@ -37,9 +37,9 @@ public class UserTeamController {
     private final JwtService jwtService;
 
     public UserTeamController(UserTeamService userTeamService,
-                              TeamService teamService,
-                              UserDocumentService userDocumentService,
-                              JwtService jwtService) {
+            TeamService teamService,
+            UserDocumentService userDocumentService,
+            JwtService jwtService) {
         this.userTeamService = userTeamService;
         this.teamService = teamService;
         this.userDocumentService = userDocumentService;
@@ -53,7 +53,8 @@ public class UserTeamController {
             token = authHeader.substring(7);
         } else if (request.getCookies() != null) {
             for (jakarta.servlet.http.Cookie c : request.getCookies()) {
-                if ("accessToken".equalsIgnoreCase(c.getName()) || "jwt".equalsIgnoreCase(c.getName()) || "Authorization".equalsIgnoreCase(c.getName())) {
+                if ("accessToken".equalsIgnoreCase(c.getName()) || "jwt".equalsIgnoreCase(c.getName())
+                        || "Authorization".equalsIgnoreCase(c.getName())) {
                     token = c.getValue();
                     break;
                 }
@@ -70,15 +71,15 @@ public class UserTeamController {
     @GetMapping
     public ResponseEntity<List<TeamDto>> getMyTeams(HttpServletRequest request) {
         Long userId = getUserId(request);
-        
+
         // Auto-link pending invitations before returning teams
         userTeamService.processPendingInvitations(userId);
 
         // We find all teams this user belongs to
         List<TeamDto> myTeams = teamService.getAllTeams().stream()
                 .filter(team -> teamService.isUserInTeam(userId, team.getId()))
-            .peek(team -> teamService.findMembership(userId, team.getId())
-                .ifPresent(m -> team.setCurrentUserRole(m.getRole() != null ? m.getRole().name() : null)))
+                .peek(team -> teamService.findMembership(userId, team.getId())
+                        .ifPresent(m -> team.setCurrentUserRole(m.getRole() != null ? m.getRole().name() : null)))
                 .collect(Collectors.toList());
         return ResponseEntity.ok(myTeams);
     }
@@ -104,7 +105,8 @@ public class UserTeamController {
     }
 
     @GetMapping("/{teamId}/members/status")
-    public ResponseEntity<List<UserStatusDto>> getTeamMemberStatuses(@PathVariable UUID teamId, HttpServletRequest request) {
+    public ResponseEntity<List<UserStatusDto>> getTeamMemberStatuses(@PathVariable UUID teamId,
+            HttpServletRequest request) {
         Long userId = getUserId(request);
         if (!teamService.isUserInTeam(userId, teamId)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
@@ -124,7 +126,8 @@ public class UserTeamController {
     }
 
     @GetMapping("/{teamId}/documents")
-    public ResponseEntity<List<DocumentSummaryDto>> getTeamDocuments(@PathVariable UUID teamId, HttpServletRequest request) {
+    public ResponseEntity<List<DocumentSummaryDto>> getTeamDocuments(@PathVariable UUID teamId,
+            HttpServletRequest request) {
         Long userId = getUserId(request);
         if (!teamService.isUserInTeam(userId, teamId)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
@@ -135,7 +138,8 @@ public class UserTeamController {
     @PostMapping
     public ResponseEntity<TeamDto> createTeam(@RequestBody TeamDto request, HttpServletRequest httpRequest) {
         Long userId = getUserId(httpRequest);
-        TeamDto created = userTeamService.createTeam(request.getName(), request.getDescription(), request.getMembers(), userId);
+        TeamDto created = userTeamService.createTeam(request.getName(), request.getDescription(), request.getMembers(),
+                userId);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
@@ -147,42 +151,63 @@ public class UserTeamController {
     }
 
     @PostMapping("/{teamId}/members")
-    public ResponseEntity<TeamMemberDto> addMember(@PathVariable UUID teamId, @RequestBody AddMemberRequest request, HttpServletRequest httpRequest) {
+    public ResponseEntity<TeamMemberDto> addMember(@PathVariable UUID teamId, @RequestBody AddMemberRequest request,
+            HttpServletRequest httpRequest) {
         Long userId = getUserId(httpRequest);
         TeamMemberDto added = userTeamService.addMember(teamId, request, userId);
         return ResponseEntity.status(HttpStatus.CREATED).body(added);
     }
 
-    @DeleteMapping("/{teamId}/members/{memberId}")
-    public ResponseEntity<Void> removeMember(@PathVariable UUID teamId, @PathVariable Long memberId, HttpServletRequest request) {
+    @DeleteMapping("/{teamId}/members/{memberIdOrInvitationId}")
+    public ResponseEntity<Void> removeMember(@PathVariable UUID teamId, @PathVariable String memberIdOrInvitationId,
+            HttpServletRequest request) {
         Long userId = getUserId(request);
-        userTeamService.removeMember(teamId, memberId, userId);
+        try {
+            Long memberId = Long.parseLong(memberIdOrInvitationId);
+            userTeamService.removeMember(teamId, memberId, userId);
+        } catch (NumberFormatException e) {
+            UUID invitationId = UUID.fromString(memberIdOrInvitationId);
+            userTeamService.removeInvitation(teamId, invitationId, userId);
+        }
         return ResponseEntity.noContent().build();
     }
 
-    @PutMapping("/{teamId}/members/{memberId}/role")
-    public ResponseEntity<Void> updateMemberRole(@PathVariable UUID teamId, @PathVariable Long memberId, @RequestBody AddMemberRequest request, HttpServletRequest httpRequest) {
+    @PutMapping("/{teamId}/members/{memberIdOrInvitationId}/role")
+    public ResponseEntity<Void> updateMemberRole(@PathVariable UUID teamId, @PathVariable String memberIdOrInvitationId,
+            @RequestBody AddMemberRequest request, HttpServletRequest httpRequest) {
         Long userId = getUserId(httpRequest);
-        userTeamService.updateMemberRole(teamId, memberId, request.getRole(), userId);
+        try {
+            Long memberId = Long.parseLong(memberIdOrInvitationId);
+            userTeamService.updateMemberRole(teamId, memberId, request.getRole(), userId);
+        } catch (NumberFormatException e) {
+            UUID invitationId = UUID.fromString(memberIdOrInvitationId);
+            userTeamService.updateInvitationRole(teamId, invitationId, request.getRole(), userId);
+        }
         return ResponseEntity.ok().build();
     }
 
-    @PutMapping("/{teamId}/members/{memberId}/chat-block")
+    @PutMapping("/{teamId}/members/{memberIdOrInvitationId}/chat-block")
     public ResponseEntity<Void> updateMemberChatBlock(
             @PathVariable UUID teamId,
-            @PathVariable Long memberId,
+            @PathVariable String memberIdOrInvitationId,
             @RequestParam boolean blocked,
             HttpServletRequest request) {
         Long userId = getUserId(request);
         if (!teamService.isUserInTeam(userId, teamId)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
-        userTeamService.setMemberChatAccess(teamId, memberId, blocked, userId);
+        try {
+            Long memberId = Long.parseLong(memberIdOrInvitationId);
+            userTeamService.setMemberChatAccess(teamId, memberId, blocked, userId);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Cannot update chat block for pending invitation");
+        }
         return ResponseEntity.ok().build();
     }
 
     @DeleteMapping("/{teamId}/documents/{documentId}")
-    public ResponseEntity<Void> deleteDocument(@PathVariable UUID teamId, @PathVariable UUID documentId, HttpServletRequest request) {
+    public ResponseEntity<Void> deleteDocument(@PathVariable UUID teamId, @PathVariable UUID documentId,
+            HttpServletRequest request) {
         Long userId = getUserId(request);
         userDocumentService.deleteDocument(documentId, userId, teamId);
         return ResponseEntity.noContent().build();
