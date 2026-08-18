@@ -370,7 +370,7 @@ public class UserTeamService {
     @Transactional
     public void acceptInvitation(UUID invitationId, Long userId) {
         TeamInvitation invitation = teamInvitationRepository.findById(invitationId)
-                .orElseThrow(() -> new EntityNotFoundException("Invitation not found: " + invitationId));
+                .orElseThrow(() -> new IllegalArgumentException("Invitation was deleted."));
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new EntityNotFoundException("User not found: " + userId));
@@ -443,7 +443,7 @@ public class UserTeamService {
     @Transactional
     public void declineInvitation(UUID invitationId, Long userId) {
         TeamInvitation invitation = teamInvitationRepository.findById(invitationId)
-                .orElseThrow(() -> new EntityNotFoundException("Invitation not found: " + invitationId));
+                .orElseThrow(() -> new IllegalArgumentException("Invitation was deleted."));
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new EntityNotFoundException("User not found: " + userId));
@@ -633,5 +633,44 @@ public class UserTeamService {
         } catch (Exception e) {
             // Keep going if WS fails
         }
+    }
+
+    @Transactional
+    public void removeInvitation(UUID teamId, UUID invitationId, Long requesterId) {
+        if (!teamService.isUserRoleInTeam(requesterId, teamId, TeamRole.LEADER)) {
+            throw new IllegalStateException("Only the LEADER can remove invitations");
+        }
+        
+        TeamInvitation invitation = teamInvitationRepository.findById(invitationId)
+                .orElseThrow(() -> new jakarta.persistence.EntityNotFoundException("Invitation not found: " + invitationId));
+        
+        if (!invitation.getTeamId().equals(teamId)) {
+            throw new IllegalStateException("Invitation does not belong to this team");
+        }
+        
+        // As requested: Do NOT delete the notification. It will be handled when the user tries to accept/decline.
+        teamInvitationRepository.delete(invitation);
+    }
+
+    @Transactional
+    public void updateInvitationRole(UUID teamId, UUID invitationId, String newRole, Long requesterId) {
+        if (!teamService.isUserRoleInTeam(requesterId, teamId, TeamRole.LEADER)) {
+            throw new IllegalStateException("Only the LEADER can update roles");
+        }
+        
+        TeamInvitation invitation = teamInvitationRepository.findById(invitationId)
+                .orElseThrow(() -> new jakarta.persistence.EntityNotFoundException("Invitation not found: " + invitationId));
+                
+        if (!invitation.getTeamId().equals(teamId)) {
+            throw new IllegalStateException("Invitation does not belong to this team");
+        }
+        
+        TeamRole role = TeamRole.valueOf(newRole);
+        if (role == TeamRole.LEADER) {
+            throw new IllegalStateException("Cannot invite as LEADER");
+        }
+        
+        invitation.setRole(role);
+        teamInvitationRepository.save(invitation);
     }
 }

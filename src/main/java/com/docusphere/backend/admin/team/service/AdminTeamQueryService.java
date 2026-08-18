@@ -63,7 +63,7 @@ public class AdminTeamQueryService {
         AdminMemberView v = new AdminMemberView();
         v.setEmail(inv.getEmail()); v.setRole(inv.getRole().name()); v.setTeamId(inv.getTeamId()); v.setFullName("Pending Invitation");
         v.setStatus("Pending");
-        v.setMembershipId(java.util.UUID.nameUUIDFromBytes(inv.getEmail().getBytes()));
+        v.setMembershipId(inv.getId()); // Use the actual DB UUID so delete/role-change works
         return v;
     }
 }

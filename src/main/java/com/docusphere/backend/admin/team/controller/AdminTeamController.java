@@ -11,7 +11,6 @@ import com.docusphere.backend.team.entity.Team;
 import com.docusphere.backend.team.service.TeamService;
 import jakarta.validation.Valid;
 
-
 import org.springframework.http.HttpStatus;
 
 import org.springframework.http.ResponseEntity;
@@ -32,6 +31,7 @@ public class AdminTeamController {
     private final AdminTeamMergeService mergeService;
     private final AdminTeamDocumentService documentService;
     private final TeamService teamService;
+
     public AdminTeamController(AdminTeamCoreService coreService,
             AdminTeamQueryService queryService,
             AdminTeamMemberService memberService,
@@ -80,16 +80,28 @@ public class AdminTeamController {
         return ResponseEntity.status(HttpStatus.CREATED).body(memberService.addMember(teamId, request));
     }
 
-    @DeleteMapping("/{teamId}/members/{userId}")
-    public ResponseEntity<Void> deleteMember(@PathVariable UUID teamId, @PathVariable Long userId) {
-        memberService.deleteMember(teamId, userId);
+    @DeleteMapping("/{teamId}/members/{userIdOrInvitationId}")
+    public ResponseEntity<Void> deleteMember(@PathVariable UUID teamId, @PathVariable String userIdOrInvitationId) {
+        try {
+            Long userId = Long.parseLong(userIdOrInvitationId);
+            memberService.deleteMember(teamId, userId);
+        } catch (NumberFormatException e) {
+            UUID invitationId = UUID.fromString(userIdOrInvitationId);
+            memberService.deleteInvitation(teamId, invitationId);
+        }
         return ResponseEntity.noContent().build();
     }
 
-    @PutMapping("/{teamId}/members/{userId}/role")
-    public ResponseEntity<Void> updateMemberRole(@PathVariable UUID teamId, @PathVariable Long userId,
+    @PutMapping("/{teamId}/members/{userIdOrInvitationId}/role")
+    public ResponseEntity<Void> updateMemberRole(@PathVariable UUID teamId, @PathVariable String userIdOrInvitationId,
             @Valid @RequestBody AddMemberRequest request) {
-        memberService.updateMemberRole(teamId, userId, request.getRole());
+        try {
+            Long userId = Long.parseLong(userIdOrInvitationId);
+            memberService.updateMemberRole(teamId, userId, request.getRole());
+        } catch (NumberFormatException e) {
+            UUID invitationId = UUID.fromString(userIdOrInvitationId);
+            memberService.updateInvitationRole(teamId, invitationId, request.getRole());
+        }
         return ResponseEntity.ok().build();
     }
 

@@ -42,16 +42,16 @@ public class User {
 
     // Account Lockout Fields
     @Column(name = "failed_login_attempts", nullable = false)
-    private int failedLoginAttempts = 0;
+    private Integer failedLoginAttempts = 0;
 
     @Column(name = "account_locked", nullable = false)
-    private boolean accountLocked = false;
+    private Boolean accountLocked = false;
 
     @Column(name = "locked_until")
     private LocalDateTime lockedUntil;
 
     public boolean isAccountLocked() {
-        if (!accountLocked) {
+        if (accountLocked == null || !accountLocked) {
             return false;
         }
 

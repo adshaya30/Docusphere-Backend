@@ -1,3 +1,4 @@
+
 package com.docusphere.backend.admin.team.service;
 
 import com.docusphere.backend.admin.team.dto.AdminMemberView;
@@ -18,8 +19,6 @@ import com.docusphere.backend.notification.service.NotificationHelper;
 import com.docusphere.backend.notification.util.NotificationUserIds;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.Authentication;
-
-
 
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
@@ -131,6 +130,19 @@ public class AdminTeamMemberService {
     }
 
     @Transactional
+    public void deleteInvitation(UUID teamId, UUID invitationId) {
+        TeamInvitation invitation = teamInvitationRepository.findById(invitationId)
+                .orElseThrow(() -> new EntityNotFoundException("Invitation not found: " + invitationId));
+        
+        if (!invitation.getTeamId().equals(teamId)) {
+            throw new IllegalStateException("Invitation does not belong to this team");
+        }
+        
+        // As requested: Do NOT delete the notification. It will be handled when the user tries to accept/decline.
+        teamInvitationRepository.delete(invitation);
+    }
+
+    @Transactional
     public void deleteMember(UUID teamId, Long userId) {
         TeamMember m = teamMemberRepository.findByUserIdAndTeamId(userId, teamId).orElseThrow(() -> new EntityNotFoundException("Not a member"));
         if (m.getRole() == TeamRole.LEADER) throw new IllegalStateException("Cannot delete LEADER");
@@ -193,5 +205,23 @@ public class AdminTeamMemberService {
         } catch (Exception e) {
             // Non-fatal
         }
+    }
+
+    @Transactional
+    public void updateInvitationRole(UUID teamId, UUID invitationId, String newRole) {
+        TeamInvitation invitation = teamInvitationRepository.findById(invitationId)
+                .orElseThrow(() -> new EntityNotFoundException("Invitation not found: " + invitationId));
+                
+        if (!invitation.getTeamId().equals(teamId)) {
+            throw new IllegalStateException("Invitation does not belong to this team");
+        }
+        
+        TeamRole role = TeamRole.valueOf(newRole);
+        if (role == TeamRole.LEADER) {
+            throw new IllegalStateException("Cannot invite as LEADER");
+        }
+        
+        invitation.setRole(role);
+        teamInvitationRepository.save(invitation);
     }
 }
